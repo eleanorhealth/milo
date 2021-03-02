@@ -1,4 +1,4 @@
-module github.com/fterrag/milo
+module github.com/eleanorhealth/milo
 
 go 1.15
 
