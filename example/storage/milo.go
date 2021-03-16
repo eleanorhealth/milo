@@ -3,7 +3,7 @@ package storage
 import (
 	"reflect"
 
-	"github.com/fterrag/milo/example/domain"
+	"github.com/eleanorhealth/milo/example/domain"
 )
 
 // MiloEntityModelMap is used by milo to map domain entities to storage models.

@@ -3,7 +3,7 @@ package domain
 import (
 	"time"
 
-	"github.com/fterrag/milo/example/entityid"
+	"github.com/eleanorhealth/milo/example/entityid"
 )
 
 type CarePlan struct {

@@ -3,9 +3,9 @@ package storage
 import (
 	"time"
 
-	"github.com/fterrag/milo"
-	"github.com/fterrag/milo/example/domain"
-	"github.com/fterrag/milo/example/entityid"
+	"github.com/eleanorhealth/milo"
+	"github.com/eleanorhealth/milo/example/domain"
+	"github.com/eleanorhealth/milo/example/entityid"
 )
 
 type carePlan struct {
