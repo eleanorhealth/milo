@@ -1,5 +1,7 @@
 # Milo
 
+A utility for https://github.com/go-pg/pg that makes persisting DDD aggregates easier.
+
 ## Running Tests and Example
 
 ```bash
