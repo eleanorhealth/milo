@@ -1,0 +1,12 @@
+language: go
+go:
+  - "1.16"
+services:
+  - docker
+branches:
+  only:
+    - master
+script:
+  - docker-compose up -d postgres
+  - sleep 5
+  - go test -v -race ./...

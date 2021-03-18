@@ -7,8 +7,8 @@ import (
 
 func CreateSchema(db *pg.DB) error {
 	models := []interface{}{
-		(*carePlan)(nil),
-		(*goal)(nil),
+		(*customer)(nil),
+		(*address)(nil),
 	}
 
 	for _, model := range models {

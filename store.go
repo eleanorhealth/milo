@@ -22,7 +22,7 @@ type Store struct {
 
 var _ Storer = (*Store)(nil)
 
-func NewStore(db orm.DB, entityModelMap map[reflect.Type]reflect.Type) *Store {
+func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
 	for entityType, modelType := range entityModelMap {
 		if entityType.Kind() != reflect.Ptr {
 			panic(fmt.Sprintf("entity type %s must be a pointer", entityType.String()))
