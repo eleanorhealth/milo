@@ -2,20 +2,114 @@
 
 A utility for https://github.com/go-pg/pg that makes persisting DDD aggregates easier.
 
-## Running Tests and Example
+## Quick Start
+
+The best place to start exploring Milo is by taking a look at the [example](/example). It may help to have a high level understanding of [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) before looking at the example code.
+
+Run the example:
+```bash
+$ docker-compose up postgres
+$ go run example/cmd/main.go
+```
+
+In the [example/cmd/example/main.go](/example/cmd/example/main.go), we see that Milo allows us to persist a `Customer` entity (including the nested addresses) to the database:
+
+```go
+store := milo.NewStore(db, storage.MiloEntityModelMap)
+
+customer := &domain.Customer{
+    ID: entityid.DefaultGenerator.Generate(),
+
+    NameFirst: "John",
+    NameLast:  "Smith",
+
+    Addresses: []*domain.Address{
+        {
+            ID: entityid.DefaultGenerator.Generate(),
+
+            Street: "1 City Hall Square #500",
+            City:   "Boston",
+            State:  "MA",
+            Zip:    "02201",
+        },
+    },
+}
+
+err = store.Save(customer)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+To make this work, Milo needs to be configured to understand how to map entities to storage models. This is done by passing a `milo.EntityModelMap` to `NewStore`:
+
+```go
+store := milo.NewStore(db, storage.MiloEntityModelMap)
+```
+
+Code from [example/storage/milo.go](/example/storage/milo.go):
+
+```go
+// MiloEntityModelMap is used by milo to map domain entities to storage models.
+var MiloEntityModelMap = map[reflect.Type]reflect.Type{
+	reflect.TypeOf(&domain.Customer{}): reflect.TypeOf(&customer{}),
+}
+```
+
+The last step is to implement `FromEntity` and `ToEntity` on the storage model. These two methods are what Milo calls to transform entities and models to and from eachother. Code from [example/storage/customer.go](/example/storage/customer.go):
+
+```go
+func (c *customer) FromEntity(e interface{}) error {
+	entity := e.(*domain.Customer)
+
+	c.ID = entity.ID.String()
+
+	c.NameFirst = entity.NameFirst
+	c.NameFirst = entity.NameLast
+
+	for _, a := range entity.Addresses {
+		c.Addresses = append(c.Addresses, &address{
+			ID:         a.ID.String(),
+			CustomerID: c.ID,
+
+			Street: a.Street,
+			City:   a.City,
+			State:  a.State,
+			Zip:    a.Zip,
+		})
+	}
+
+	return nil
+}
+
+func (c *customer) ToEntity() (interface{}, error) {
+	entity := &domain.Customer{}
+
+	entity.ID = entityid.ID(c.ID)
+
+	entity.NameFirst = c.NameFirst
+	entity.NameLast = c.NameLast
+
+	for _, a := range c.Addresses {
+		entity.Addresses = append(entity.Addresses, &domain.Address{
+			ID: entityid.ID(a.ID),
+
+			Street: a.Street,
+			City:   a.City,
+			State:  a.State,
+			Zip:    a.Zip,
+		})
+	}
+
+	return entity, nil
+}
+```
+
+## Running Tests
 
 ```bash
 $ docker-compose up -d
-```
-
-Tests:
-```bash
 $ go test -v ./...
-```
-
-Example:
-```bash
-$ go run example/cmd/example/main.go
 ```
 
 ## Known Limitations

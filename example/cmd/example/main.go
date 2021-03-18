@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/eleanorhealth/milo"
 	"github.com/eleanorhealth/milo/example/domain"
@@ -28,22 +28,28 @@ func main() {
 
 	store := milo.NewStore(db, storage.MiloEntityModelMap)
 
-	carePlan := &domain.CarePlan{
+	customer := &domain.Customer{
 		ID: entityid.DefaultGenerator.Generate(),
 
-		Goals: []*domain.Goal{
+		NameFirst: "John",
+		NameLast:  "Smith",
+
+		Addresses: []*domain.Address{
 			{
-				ID:    entityid.DefaultGenerator.Generate(),
-				Title: "Exercise",
-				Body:  "Exercise at least 3 times a week.",
+				ID: entityid.DefaultGenerator.Generate(),
+
+				Street: "1 City Hall Square #500",
+				City:   "Boston",
+				State:  "MA",
+				Zip:    "02201",
 			},
 		},
-
-		YearOfCare: time.Now(),
 	}
 
-	err = store.Save(carePlan)
+	err = store.Save(customer)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("Successfully saved customer %s %s\n", customer.NameFirst, customer.NameLast)
 }

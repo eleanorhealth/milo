@@ -1,22 +1,23 @@
 package domain
 
 import (
-	"time"
-
 	"github.com/eleanorhealth/milo/example/entityid"
 )
 
-type CarePlan struct {
+type Customer struct {
 	ID entityid.ID
 
-	Goals []*Goal
+	NameFirst string
+	NameLast  string
 
-	YearOfCare time.Time
+	Addresses []*Address
 }
 
-type Goal struct {
+type Address struct {
 	ID entityid.ID
 
-	Title string
-	Body  string
+	Street string
+	City   string
+	State  string
+	Zip    string
 }
