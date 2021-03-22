@@ -152,7 +152,7 @@ func (s *Store) Save(entity interface{}) error {
 		return errors.Wrapf(err, "calling FromEntity on %s", modelType.Elem().String())
 	}
 
-	exists, err := s.db.Model(model).Exists()
+	exists, err := s.db.Model(model).WherePK().Exists()
 	if err != nil {
 		return err
 	}
