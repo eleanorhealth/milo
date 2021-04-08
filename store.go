@@ -11,6 +11,7 @@ import (
 type Storer interface {
 	Find(interface{}) error
 	FindByID(entity interface{}, id interface{}) error
+	FindBy(entity interface{}, field Field, val interface{}) error
 	Save(interface{}) error
 	Delete(interface{}) error
 }
@@ -119,6 +120,42 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 
 	pk := query.TableModel().Table().PKs[0]
 	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, pk.SQLName), id)
+
+	err := query.First()
+	if err != nil {
+		return err
+	}
+
+	toEntity, err := model.ToEntity()
+	if err != nil {
+		return err
+	}
+
+	entityValue := reflect.ValueOf(entity)
+	reflect.Indirect(entityValue).Set(reflect.Indirect(reflect.ValueOf(toEntity)))
+
+	return nil
+}
+
+func (s *Store) FindBy(entity interface{}, field Field, val interface{}) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelType, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelType.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+
+	relations := s.db.Model(model).TableModel().Table().Relations
+	for _, relation := range relations {
+		query.Relation(relation.Field.GoName)
+	}
+
+	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, field), val)
 
 	err := query.First()
 	if err != nil {
