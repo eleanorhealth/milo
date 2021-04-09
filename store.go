@@ -9,11 +9,12 @@ import (
 )
 
 type Storer interface {
-	Find(interface{}) error
+	Find(entities interface{}) error
+	FindBy(entities interface{}, field Field, val interface{}) error
+	FindOneBy(entity interface{}, field Field, val interface{}) error
 	FindByID(entity interface{}, id interface{}) error
-	FindBy(entity interface{}, field Field, val interface{}) error
-	Save(interface{}) error
-	Delete(interface{}) error
+	Save(entity interface{}) error
+	Delete(entity interface{}) error
 }
 
 type Store struct {
@@ -100,44 +101,62 @@ func (s *Store) Find(entities interface{}) error {
 	return nil
 }
 
-func (s *Store) FindByID(entity interface{}, id interface{}) error {
-	entityType := reflect.TypeOf(entity)
+func (s *Store) FindBy(entities interface{}, field Field, val interface{}) error {
+	entitiesType := reflect.TypeOf(entities)
+
+	if entitiesType.Kind() != reflect.Ptr {
+		return errors.New("must be pointer")
+	}
+
+	if entitiesType.Elem().Kind() != reflect.Slice {
+		return errors.New("must be slice")
+	}
+
+	entityType := entitiesType.Elem().Elem()
+
+	if entityType.Kind() != reflect.Ptr {
+		return errors.New("must be slice of pointers")
+	}
 
 	modelType, ok := s.entityModelMap[entityType]
 	if !ok {
 		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
 	}
 
-	modelValue := reflect.New(modelType.Elem())
-	model := modelValue.Interface().(Model)
+	modelsValue := reflect.New(reflect.SliceOf(modelType))
+	models := modelsValue.Interface()
 
-	query := s.db.Model(model)
+	query := s.db.Model(models)
+	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, field), val)
 
-	relations := s.db.Model(model).TableModel().Table().Relations
+	relations := s.db.Model(models).TableModel().Table().Relations
 	for _, relation := range relations {
 		query.Relation(relation.Field.GoName)
 	}
 
-	pk := query.TableModel().Table().PKs[0]
-	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, pk.SQLName), id)
-
-	err := query.First()
+	err := query.Select()
 	if err != nil {
 		return err
 	}
 
-	toEntity, err := model.ToEntity()
-	if err != nil {
-		return err
-	}
+	entitiesValue := reflect.ValueOf(entities).Elem()
 
-	entityValue := reflect.ValueOf(entity)
-	reflect.Indirect(entityValue).Set(reflect.Indirect(reflect.ValueOf(toEntity)))
+	for i := 0; i < modelsValue.Elem().Len(); i++ {
+		modelValue := modelsValue.Elem().Index(i)
+		model := modelValue.Interface().(Model)
+
+		entity, err := model.ToEntity()
+		if err != nil {
+			return err
+		}
+
+		entitiesValue.Set(reflect.Append(entitiesValue, reflect.ValueOf(entity)))
+	}
 
 	return nil
 }
 
-func (s *Store) FindBy(entity interface{}, field Field, val interface{}) error {
+func (s *Store) FindOneBy(entity interface{}, field Field, val interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelType, ok := s.entityModelMap[entityType]
@@ -171,6 +190,23 @@ func (s *Store) FindBy(entity interface{}, field Field, val interface{}) error {
 	reflect.Indirect(entityValue).Set(reflect.Indirect(reflect.ValueOf(toEntity)))
 
 	return nil
+}
+
+func (s *Store) FindByID(entity interface{}, id interface{}) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelType, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelType.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+	pk := query.TableModel().Table().PKs[0]
+
+	return s.FindOneBy(entity, Field(pk.SQLName), id)
 }
 
 func (s *Store) Save(entity interface{}) error {
@@ -241,7 +277,12 @@ func (s *Store) Delete(entity interface{}) error {
 	modelValue := reflect.New(modelType.Elem())
 	model := modelValue.Interface().(Model)
 
-	_, err := s.db.Model(model).WherePK().Delete()
+	err := model.FromEntity(entity)
+	if err != nil {
+		return errors.Wrapf(err, "calling FromEntity on %s", modelType.Elem().String())
+	}
+
+	_, err = s.db.Model(model).WherePK().Delete()
 	if err != nil {
 		return err
 	}

@@ -247,14 +247,25 @@ func TestStore_Pointer(t *testing.T) {
 	assert.Equal(user, foundUser)
 
 	foundUser = &userEntityPtr{}
-	err = store.FindBy(foundUser, Field("name_first"), user.NameFirst)
+	err = store.FindOneBy(foundUser, Field("name_first"), user.NameFirst)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
 	foundUser = &userEntityPtr{}
-	err = store.FindBy(foundUser, Field("name_first"), "foo")
+	err = store.FindOneBy(foundUser, Field("name_first"), "foo")
 	assert.Error(err)
 	assert.NotEqual(user, foundUser)
+
+	foundUsers := []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Field("name_first"), user.NameFirst)
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Equal(user, foundUsers[0])
+
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Field("name_first"), "foo")
+	assert.NoError(err)
+	assert.Len(foundUsers, 0)
 }
 
 type userEntity struct {
