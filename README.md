@@ -51,7 +51,7 @@ Code from [example/storage/milo.go](/example/storage/milo.go):
 
 ```go
 // MiloEntityModelMap is used by milo to map domain entities to storage models.
-var MiloEntityModelMap = map[reflect.Type]reflect.Type{
+var MiloEntityModelMap = EntityModelMap{
 	reflect.TypeOf(&domain.Customer{}): reflect.TypeOf(&customer{}),
 }
 ```

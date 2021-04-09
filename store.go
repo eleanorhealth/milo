@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+type EntityModelMap map[reflect.Type]reflect.Type
+
 type Field string
 
 type Storer interface {
@@ -21,7 +23,7 @@ type Storer interface {
 
 type Store struct {
 	db             orm.DB
-	entityModelMap map[reflect.Type]reflect.Type
+	entityModelMap EntityModelMap
 }
 
 var _ Storer = (*Store)(nil)

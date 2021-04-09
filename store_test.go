@@ -191,7 +191,7 @@ func TestStore_Pointer(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, map[reflect.Type]reflect.Type{
+	store := NewStore(db, EntityModelMap{
 		reflect.TypeOf(&userEntityPtr{}): reflect.TypeOf(&userModelPtr{}),
 	})
 
@@ -405,7 +405,7 @@ func TestStore_NonPointer(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, map[reflect.Type]reflect.Type{
+	store := NewStore(db, EntityModelMap{
 		reflect.TypeOf(&userEntity{}): reflect.TypeOf(&userModel{}),
 	})
 
