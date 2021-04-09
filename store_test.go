@@ -241,12 +241,21 @@ func TestStore_Pointer(t *testing.T) {
 	err = store.Save(user)
 	assert.NoError(err)
 
-	foundUser := &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
+	// Find
+	foundUsers := []*userEntityPtr{}
+	err = store.Find(&foundUsers)
 	assert.NoError(err)
-	assert.Equal(user, foundUser)
+	assert.Len(foundUsers, 1)
+	assert.Equal(user, foundUsers[0])
 
-	foundUser = &userEntityPtr{}
+	// FindBy
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Field("name_first"), "foo")
+	assert.NoError(err)
+	assert.Len(foundUsers, 0)
+
+	// FindOneBy
+	foundUser := &userEntityPtr{}
 	err = store.FindOneBy(foundUser, Field("name_first"), user.NameFirst)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
@@ -256,16 +265,21 @@ func TestStore_Pointer(t *testing.T) {
 	assert.Error(err)
 	assert.NotEqual(user, foundUser)
 
-	foundUsers := []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Field("name_first"), user.NameFirst)
+	// FindByID
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
-	assert.Len(foundUsers, 1)
-	assert.Equal(user, foundUsers[0])
+	assert.Equal(user, foundUser)
 
-	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Field("name_first"), "foo")
+	// Delete
+	err = store.Delete(user)
 	assert.NoError(err)
-	assert.Len(foundUsers, 0)
+
+	// Check if the user was deleted.
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
+	assert.Error(err)
+	assert.ErrorIs(err, pg.ErrNoRows)
 }
 
 type userEntity struct {

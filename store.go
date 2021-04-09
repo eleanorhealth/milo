@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+type Field string
+
 type Storer interface {
 	Find(entities interface{}) error
 	FindBy(entities interface{}, field Field, val interface{}) error
