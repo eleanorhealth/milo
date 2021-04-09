@@ -250,6 +250,11 @@ func TestStore_Pointer(t *testing.T) {
 
 	// FindBy
 	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Field("name_first"), user.NameFirst)
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+
+	foundUsers = []*userEntityPtr{}
 	err = store.FindBy(&foundUsers, Field("name_first"), "foo")
 	assert.NoError(err)
 	assert.Len(foundUsers, 0)
