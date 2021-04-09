@@ -50,9 +50,11 @@ store := milo.NewStore(db, storage.MiloEntityModelMap)
 Code from [example/storage/milo.go](/example/storage/milo.go):
 
 ```go
-// MiloEntityModelMap is used by milo to map domain entities to storage models.
-var MiloEntityModelMap = map[reflect.Type]reflect.Type{
-	reflect.TypeOf(&domain.Customer{}): reflect.TypeOf(&customer{}),
+var MiloEntityModelMap = milo.EntityModelMap{
+	reflect.TypeOf(&domain.Customer{}): milo.ModelConfig{
+		Model:          reflect.TypeOf(&customer{}),
+		FieldColumnMap: milo.FieldColumnMap{},
+	},
 }
 ```
 
@@ -103,6 +105,33 @@ func (c *customer) ToEntity() (interface{}, error) {
 
 	return entity, nil
 }
+```
+
+### FindBy and FindOneBy
+
+If you'd like to make use of `FindBy` and `FindOneBy`, you'll need to provide a FieldColumnMap so that Milo knows how to query by fields:
+
+```go
+var MiloEntityModelMap = milo.EntityModelMap{
+	reflect.TypeOf(&domain.Customer{}): milo.ModelConfig{
+		Model:          reflect.TypeOf(&customer{}),
+		FieldColumnMap: milo.FieldColumnMap{
+			"NameFirst": "name_first",
+		},
+	},
+}
+```
+
+Now you'll be able to use `FindBy` and `FindOneBy`:
+
+```go
+// Find all customers named John.
+customers := []*domain.Customer{}
+store.FindBy(&customers, "NameFirst", "John")
+
+// Find the first customer named John.
+customer := &domain.Customer{}
+store.FindOneBy(customer, "NameFirst", "John")
 ```
 
 ## Running Tests
