@@ -8,14 +8,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-type EntityModelMap map[reflect.Type]reflect.Type
+type Column string
 
-type Field string
+type FieldColumnMap map[interface{}]Column
+
+type ModelConfig struct {
+	Model          reflect.Type
+	FieldColumnMap FieldColumnMap
+}
+
+type EntityModelMap map[reflect.Type]ModelConfig
 
 type Storer interface {
 	Find(entities interface{}) error
-	FindBy(entities interface{}, field Field, val interface{}) error
-	FindOneBy(entity interface{}, field Field, val interface{}) error
+	FindBy(entities interface{}, field interface{}, val interface{}) error
+	FindOneBy(entity interface{}, field interface{}, val interface{}) error
 	FindByID(entity interface{}, id interface{}) error
 	Save(entity interface{}) error
 	Delete(entity interface{}) error
@@ -29,19 +36,19 @@ type Store struct {
 var _ Storer = (*Store)(nil)
 
 func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
-	for entityType, modelType := range entityModelMap {
+	for entityType, modelConfig := range entityModelMap {
 		if entityType.Kind() != reflect.Ptr {
 			panic(fmt.Sprintf("entity type %s must be a pointer", entityType.String()))
 		}
 
-		if modelType.Kind() != reflect.Ptr {
-			panic(fmt.Sprintf("model type %s must be a pointer", modelType.String()))
+		if modelConfig.Model.Kind() != reflect.Ptr {
+			panic(fmt.Sprintf("model type %s must be a pointer", modelConfig.Model.String()))
 		}
 
 		modelInterfaceType := reflect.TypeOf((*Model)(nil)).Elem()
 
-		if !modelType.Implements(modelInterfaceType) {
-			panic(fmt.Sprintf("model type %s must implement %s", modelType.String(), modelInterfaceType.String()))
+		if !modelConfig.Model.Implements(modelInterfaceType) {
+			panic(fmt.Sprintf("model type %s must implement %s", modelConfig.Model.String(), modelInterfaceType.String()))
 		}
 	}
 
@@ -68,12 +75,12 @@ func (s *Store) Find(entities interface{}) error {
 		return errors.New("must be slice of pointers")
 	}
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelsValue := reflect.New(reflect.SliceOf(modelType))
+	modelsValue := reflect.New(reflect.SliceOf(modelConfig.Model))
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
@@ -105,7 +112,7 @@ func (s *Store) Find(entities interface{}) error {
 	return nil
 }
 
-func (s *Store) FindBy(entities interface{}, field Field, val interface{}) error {
+func (s *Store) FindBy(entities interface{}, field interface{}, val interface{}) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -122,16 +129,24 @@ func (s *Store) FindBy(entities interface{}, field Field, val interface{}) error
 		return errors.New("must be slice of pointers")
 	}
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelsValue := reflect.New(reflect.SliceOf(modelType))
+	var column Column
+	if column, ok = field.(Column); !ok {
+		column, ok = modelConfig.FieldColumnMap[field]
+		if !ok {
+			return fmt.Errorf("unable to find column for field %s on entity type %s", field, entityType.String())
+		}
+	}
+
+	modelsValue := reflect.New(reflect.SliceOf(modelConfig.Model))
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
-	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, field), val)
+	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, column), val)
 
 	relations := s.db.Model(models).TableModel().Table().Relations
 	for _, relation := range relations {
@@ -160,15 +175,23 @@ func (s *Store) FindBy(entities interface{}, field Field, val interface{}) error
 	return nil
 }
 
-func (s *Store) FindOneBy(entity interface{}, field Field, val interface{}) error {
+func (s *Store) FindOneBy(entity interface{}, field interface{}, val interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelValue := reflect.New(modelType.Elem())
+	var column Column
+	if column, ok = field.(Column); !ok {
+		column, ok = modelConfig.FieldColumnMap[field]
+		if !ok {
+			return fmt.Errorf("unable to find column for field %s on entity type %s", field, entityType.String())
+		}
+	}
+
+	modelValue := reflect.New(modelConfig.Model.Elem())
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
@@ -178,7 +201,7 @@ func (s *Store) FindOneBy(entity interface{}, field Field, val interface{}) erro
 		query.Relation(relation.Field.GoName)
 	}
 
-	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, field), val)
+	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, column), val)
 
 	err := query.First()
 	if err != nil {
@@ -199,34 +222,34 @@ func (s *Store) FindOneBy(entity interface{}, field Field, val interface{}) erro
 func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelValue := reflect.New(modelType.Elem())
+	modelValue := reflect.New(modelConfig.Model.Elem())
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
 	pk := query.TableModel().Table().PKs[0]
 
-	return s.FindOneBy(entity, Field(pk.SQLName), id)
+	return s.FindOneBy(entity, Column(pk.SQLName), id)
 }
 
 func (s *Store) Save(entity interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelValue := reflect.New(modelType.Elem())
+	modelValue := reflect.New(modelConfig.Model.Elem())
 	model := modelValue.Interface().(Model)
 
 	err := model.FromEntity(entity)
 	if err != nil {
-		return errors.Wrapf(err, "calling FromEntity on %s", modelType.Elem().String())
+		return errors.Wrapf(err, "calling FromEntity on %s", modelConfig.Model.Elem().String())
 	}
 
 	exists, err := s.db.Model(model).WherePK().Exists()
@@ -273,17 +296,17 @@ func (s *Store) Save(entity interface{}) error {
 func (s *Store) Delete(entity interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
-	modelType, ok := s.entityModelMap[entityType]
+	modelConfig, ok := s.entityModelMap[entityType]
 	if !ok {
-		return fmt.Errorf("unable to find model type for entity type %s", entityType.String())
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	modelValue := reflect.New(modelType.Elem())
+	modelValue := reflect.New(modelConfig.Model.Elem())
 	model := modelValue.Interface().(Model)
 
 	err := model.FromEntity(entity)
 	if err != nil {
-		return errors.Wrapf(err, "calling FromEntity on %s", modelType.Elem().String())
+		return errors.Wrapf(err, "calling FromEntity on %s", modelConfig.Model.Elem().String())
 	}
 
 	_, err = s.db.Model(model).WherePK().Delete()

@@ -192,7 +192,12 @@ func TestStore_Pointer(t *testing.T) {
 	assert.NoError(err)
 
 	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&userEntityPtr{}): reflect.TypeOf(&userModelPtr{}),
+		reflect.TypeOf(&userEntityPtr{}): ModelConfig{
+			Model: reflect.TypeOf(&userModelPtr{}),
+			FieldColumnMap: FieldColumnMap{
+				"NameFirst": "name_first",
+			},
+		},
 	})
 
 	user := &userEntityPtr{
@@ -250,23 +255,23 @@ func TestStore_Pointer(t *testing.T) {
 
 	// FindBy
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Field("name_first"), user.NameFirst)
+	err = store.FindBy(&foundUsers, "NameFirst", user.NameFirst)
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Field("name_first"), "foo")
+	err = store.FindBy(&foundUsers, "NameFirst", "foo")
 	assert.NoError(err)
 	assert.Len(foundUsers, 0)
 
 	// FindOneBy
 	foundUser := &userEntityPtr{}
-	err = store.FindOneBy(foundUser, Field("name_first"), user.NameFirst)
+	err = store.FindOneBy(foundUser, "NameFirst", user.NameFirst)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
 	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, Field("name_first"), "foo")
+	err = store.FindOneBy(foundUser, "NameFirst", "foo")
 	assert.Error(err)
 	assert.NotEqual(user, foundUser)
 
@@ -406,7 +411,10 @@ func TestStore_NonPointer(t *testing.T) {
 	assert.NoError(err)
 
 	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&userEntity{}): reflect.TypeOf(&userModel{}),
+		reflect.TypeOf(&userEntity{}): ModelConfig{
+			Model:          reflect.TypeOf(&userModel{}),
+			FieldColumnMap: FieldColumnMap{},
+		},
 	})
 
 	user := &userEntity{

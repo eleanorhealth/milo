@@ -9,5 +9,8 @@ import (
 
 // MiloEntityModelMap is used by Milo to map domain entities to storage models.
 var MiloEntityModelMap = milo.EntityModelMap{
-	reflect.TypeOf(&domain.Customer{}): reflect.TypeOf(&customer{}),
+	reflect.TypeOf(&domain.Customer{}): milo.ModelConfig{
+		Model:          reflect.TypeOf(&customer{}),
+		FieldColumnMap: milo.FieldColumnMap{},
+	},
 }
