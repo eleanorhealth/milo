@@ -196,6 +196,7 @@ func TestStore_Pointer(t *testing.T) {
 			Model: reflect.TypeOf(&userModelPtr{}),
 			FieldColumnMap: FieldColumnMap{
 				"NameFirst": "name_first",
+				"NameLast":  "name_last",
 			},
 		},
 	})
@@ -255,23 +256,23 @@ func TestStore_Pointer(t *testing.T) {
 
 	// FindBy
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, "NameFirst", user.NameFirst)
+	err = store.FindBy(&foundUsers, And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, "NameFirst", "foo")
+	err = store.FindBy(&foundUsers, And(Equal("NameFirst", "foo")))
 	assert.NoError(err)
 	assert.Len(foundUsers, 0)
 
 	// FindOneBy
 	foundUser := &userEntityPtr{}
-	err = store.FindOneBy(foundUser, "NameFirst", user.NameFirst)
+	err = store.FindOneBy(foundUser, And(Equal("NameFirst", user.NameFirst)))
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
 	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, "NameFirst", "foo")
+	err = store.FindOneBy(foundUser, And(Equal("NameFirst", "foo")))
 	assert.Error(err)
 	assert.NotEqual(user, foundUser)
 
