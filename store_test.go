@@ -282,6 +282,30 @@ func TestStore_Pointer(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
+	// Transaction
+	err = store.Transaction(func(txStore *Store) error {
+		foundUser = &userEntityPtr{}
+		err = txStore.FindByIDForUpdate(foundUser, user.ID)
+		assert.NoError(err)
+		assert.Equal(user, foundUser)
+
+		foundUser.NameFirst = "Sally"
+
+		err = txStore.Save(foundUser)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	assert.NoError(err)
+
+	// Check if the transaction made the expected change.
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
+	assert.NoError(err)
+	assert.Equal("Sally", foundUser.NameFirst)
+
 	// Delete
 	err = store.Delete(user)
 	assert.NoError(err)

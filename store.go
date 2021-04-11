@@ -1,9 +1,11 @@
 package milo
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
+	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 	"github.com/pkg/errors"
 )
@@ -20,10 +22,18 @@ type ModelConfig struct {
 type EntityModelMap map[reflect.Type]ModelConfig
 
 type Storer interface {
+	Transaction(fn func(txStore *Store) error) error
 	Find(entities interface{}) error
+
 	FindBy(entities interface{}, exprs ...Expression) error
+	FindByForUpdate(entities interface{}, exprs ...Expression) error
+
 	FindOneBy(entity interface{}, exprs ...Expression) error
+	FindOneByForUpdate(entity interface{}, exprs ...Expression) error
+
 	FindByID(entity interface{}, id interface{}) error
+	FindByIDForUpdate(entity interface{}, id interface{}) error
+
 	Save(entity interface{}) error
 	Delete(entity interface{}) error
 }
@@ -56,6 +66,19 @@ func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
 		db:             db,
 		entityModelMap: entityModelMap,
 	}
+}
+
+func (s *Store) Transaction(fn func(txStore *Store) error) error {
+	if _, ok := s.db.(*pg.Tx); ok {
+		return errors.New("already in a transaction")
+	}
+
+	db := s.db.(*pg.DB)
+
+	return db.RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		txStore := NewStore(tx, s.entityModelMap)
+		return fn(txStore)
+	})
 }
 
 func (s *Store) Find(entities interface{}) error {
@@ -170,6 +193,66 @@ func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	return nil
 }
 
+func (s *Store) FindByForUpdate(entities interface{}, exprs ...Expression) error {
+	entitiesType := reflect.TypeOf(entities)
+
+	if entitiesType.Kind() != reflect.Ptr {
+		return errors.New("must be pointer")
+	}
+
+	if entitiesType.Elem().Kind() != reflect.Slice {
+		return errors.New("must be slice")
+	}
+
+	entityType := entitiesType.Elem().Elem()
+
+	if entityType.Kind() != reflect.Ptr {
+		return errors.New("must be slice of pointers")
+	}
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelsValue := reflect.New(reflect.SliceOf(modelConfig.Model))
+	models := modelsValue.Interface()
+
+	query := s.db.Model(models)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
+
+	relations := s.db.Model(models).TableModel().Table().Relations
+	for _, relation := range relations {
+		query.Relation(relation.Field.GoName)
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+
+	err = query.Select()
+	if err != nil {
+		return err
+	}
+
+	entitiesValue := reflect.ValueOf(entities).Elem()
+
+	for i := 0; i < modelsValue.Elem().Len(); i++ {
+		modelValue := modelsValue.Elem().Index(i)
+		model := modelValue.Interface().(Model)
+
+		entity, err := model.ToEntity()
+		if err != nil {
+			return err
+		}
+
+		entitiesValue.Set(reflect.Append(entitiesValue, reflect.ValueOf(entity)))
+	}
+
+	return nil
+}
+
 func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	entityType := reflect.TypeOf(entity)
 
@@ -209,6 +292,47 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	return nil
 }
 
+func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelConfig.Model.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+
+	relations := s.db.Model(model).TableModel().Table().Relations
+	for _, relation := range relations {
+		query.Relation(relation.Field.GoName)
+	}
+
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+
+	err = query.First()
+	if err != nil {
+		return err
+	}
+
+	toEntity, err := model.ToEntity()
+	if err != nil {
+		return err
+	}
+
+	entityValue := reflect.ValueOf(entity)
+	reflect.Indirect(entityValue).Set(reflect.Indirect(reflect.ValueOf(toEntity)))
+
+	return nil
+}
+
 func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
@@ -224,6 +348,23 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	pk := query.TableModel().Table().PKs[0]
 
 	return s.FindOneBy(entity, Equal(Column(pk.SQLName), id))
+}
+
+func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelConfig.Model.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+	pk := query.TableModel().Table().PKs[0]
+
+	return s.FindOneByForUpdate(entity, Equal(Column(pk.SQLName), id))
 }
 
 func (s *Store) Save(entity interface{}) error {
