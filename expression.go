@@ -11,22 +11,18 @@ const (
 	OpLte      Op = "<="
 )
 
-type ExpressionListType string
+type ExpressionType string
 
 const (
-	ExpressionTypeAnd ExpressionListType = "AND"
-	ExpressionTypeOr  ExpressionListType = "OR"
+	ExpressionTypeAnd ExpressionType = "AND"
+	ExpressionTypeOr  ExpressionType = "OR"
 )
 
 type Expression interface {
 	Field() interface{}
 	Operand() Op
 	Value() interface{}
-}
-
-type ExpressionList interface {
-	Expression
-	Type() ExpressionListType
+	Type() ExpressionType
 	Expressions() []Expression
 }
 
@@ -34,6 +30,8 @@ type expr struct {
 	field   interface{}
 	operand Op
 	value   interface{}
+	t       ExpressionType
+	exprs   []Expression
 }
 
 func (e expr) Field() interface{} {
@@ -48,26 +46,27 @@ func (e expr) Value() interface{} {
 	return e.value
 }
 
-type exprList struct {
-	expr
-	t     ExpressionListType
-	exprs []Expression
-}
-
-func (e exprList) Type() ExpressionListType {
+func (e expr) Type() ExpressionType {
 	return e.t
 }
 
-func (e exprList) Expressions() []Expression {
+func (e expr) Expressions() []Expression {
 	return e.exprs
 }
 
-func And(exprs ...Expression) ExpressionList {
-	return exprList{t: ExpressionTypeAnd, exprs: exprs}
+func And(exprs ...Expression) Expression {
+	return expr{exprs: exprs}
 }
 
-func Or(exprs ...Expression) ExpressionList {
-	return exprList{t: ExpressionTypeOr, exprs: exprs}
+func Or(exprs ...Expression) Expression {
+	for i, e := range exprs {
+		if expr, ok := e.(expr); ok {
+			expr.t = ExpressionTypeOr
+			exprs[i] = expr
+		}
+	}
+
+	return expr{exprs: exprs}
 }
 
 func Equal(field interface{}, value interface{}) Expression {
@@ -75,6 +74,7 @@ func Equal(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpEqual,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }
 
@@ -83,6 +83,7 @@ func NotEqual(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpNotEqual,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }
 
@@ -91,6 +92,7 @@ func Gt(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpGt,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }
 
@@ -99,6 +101,7 @@ func Lt(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpLt,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }
 
@@ -107,6 +110,7 @@ func Gte(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpGte,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }
 
@@ -115,5 +119,6 @@ func Lte(field interface{}, value interface{}) Expression {
 		field:   field,
 		operand: OpLte,
 		value:   value,
+		t:       ExpressionTypeAnd,
 	}
 }

@@ -564,7 +564,7 @@ func TestStore_Expressions(t *testing.T) {
 
 	// FindBy (multiple fields, Or).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Or(Equal("NameFirst", user.NameFirst), Or(Equal("NameFirst", user2.NameFirst))))
+	err = store.FindBy(&foundUsers, Or(Equal("NameFirst", user.NameFirst), Equal("NameFirst", user2.NameFirst)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 2)
 	assert.Contains(foundUsers, user)
@@ -572,7 +572,7 @@ func TestStore_Expressions(t *testing.T) {
 
 	// FindBy (multiple fields, nested).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)), Or(Equal("NameFirst", user3.NameFirst)))
+	err = store.FindBy(&foundUsers, Or(And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)), Equal("NameFirst", user3.NameFirst)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 2)
 	assert.Contains(foundUsers, user)
