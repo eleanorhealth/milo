@@ -23,7 +23,8 @@ type EntityModelMap map[reflect.Type]ModelConfig
 
 type Storer interface {
 	Transaction(fn func(txStore *Store) error) error
-	Find(entities interface{}) error
+
+	FindAll(entities interface{}) error
 
 	FindBy(entities interface{}, exprs ...Expression) error
 	FindByForUpdate(entities interface{}, exprs ...Expression) error
@@ -81,7 +82,7 @@ func (s *Store) Transaction(fn func(txStore *Store) error) error {
 	})
 }
 
-func (s *Store) Find(entities interface{}) error {
+func (s *Store) FindAll(entities interface{}) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -521,13 +522,13 @@ func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fi
 		switch e := e.(type) {
 		case ExpressionList:
 			switch e.Type() {
-			case "AND":
+			case ExprTypeAnd:
 				query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 					err := s.applyExpressionsToQuery(e.Expressions(), q, fieldColumnMap)
 					return q, err
 				})
 
-			case "OR":
+			case ExprTypeOr:
 				query.WhereOrGroup(func(q *orm.Query) (*orm.Query, error) {
 					err := s.applyExpressionsToQuery(e.Expressions(), q, fieldColumnMap)
 					return q, err

@@ -247,42 +247,50 @@ func TestStore_Pointer(t *testing.T) {
 	err = store.Save(user)
 	assert.NoError(err)
 
-	// Find
+	// FindAll.
 	foundUsers := []*userEntityPtr{}
-	err = store.Find(&foundUsers)
+	err = store.FindAll(&foundUsers)
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Equal(user, foundUsers[0])
 
-	// FindBy
+	// FindBy (one field).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)))
+	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 
+	// FindBy (multiple fields).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+
+	// FindBy (one field, no match).
 	foundUsers = []*userEntityPtr{}
 	err = store.FindBy(&foundUsers, And(Equal("NameFirst", "foo")))
 	assert.NoError(err)
 	assert.Len(foundUsers, 0)
 
-	// FindOneBy
+	// FindOneBy (one field).
 	foundUser := &userEntityPtr{}
-	err = store.FindOneBy(foundUser, And(Equal("NameFirst", user.NameFirst)))
+	err = store.FindOneBy(foundUser, Equal("NameFirst", user.NameFirst))
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
+	// FindOneBy (one field, no match).
 	foundUser = &userEntityPtr{}
 	err = store.FindOneBy(foundUser, And(Equal("NameFirst", "foo")))
 	assert.Error(err)
 	assert.NotEqual(user, foundUser)
 
-	// FindByID
+	// FindByID.
 	foundUser = &userEntityPtr{}
 	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
-	// Transaction
+	// Transaction (FindByIDForUpdate and Save).
 	err = store.Transaction(func(txStore *Store) error {
 		foundUser = &userEntityPtr{}
 		err = txStore.FindByIDForUpdate(foundUser, user.ID)
@@ -306,7 +314,7 @@ func TestStore_Pointer(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal("Sally", foundUser.NameFirst)
 
-	// Delete
+	// Delete.
 	err = store.Delete(user)
 	assert.NoError(err)
 
