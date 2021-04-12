@@ -518,32 +518,34 @@ func (s *Store) deleteRelated(model Model) error {
 func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMap FieldColumnMap) error {
 	for _, e := range exprs {
 		if len(e.exprs) > 0 {
+
 			query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 				err := s.applyExpressionsToQuery(e.exprs, q, fieldColumnMap)
 				return q, err
 			})
 
-			continue
-		}
+		} else {
 
-		var column Column
-		var ok bool
-		if column, ok = e.Field().(Column); !ok {
-			column, ok = fieldColumnMap[e.Field()]
-			if !ok {
-				return fmt.Errorf("unable to find column for field %s", e.Field())
+			var column Column
+			var ok bool
+			if column, ok = e.Field().(Column); !ok {
+				column, ok = fieldColumnMap[e.Field()]
+				if !ok {
+					return fmt.Errorf("unable to find column for field %s", e.Field())
+				}
 			}
-		}
 
-		switch e.t {
-		case expressionTypeAnd:
-			query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+			switch e.t {
+			case expressionTypeAnd:
+				query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
 
-		case expressionTypeOr:
-			query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+			case expressionTypeOr:
+				query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
 
-		default:
-			return fmt.Errorf("unknown ExpressionType: %s", e)
+			default:
+				return fmt.Errorf("unknown ExpressionType: %s", e)
+			}
+
 		}
 	}
 
