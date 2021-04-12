@@ -55,6 +55,13 @@ func (e expr) Expressions() []Expression {
 }
 
 func And(exprs ...Expression) Expression {
+	for i, e := range exprs {
+		if expr, ok := e.(expr); ok {
+			expr.t = ExpressionTypeAnd
+			exprs[i] = expr
+		}
+	}
+
 	return expr{exprs: exprs}
 }
 
