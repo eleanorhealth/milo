@@ -517,9 +517,9 @@ func (s *Store) deleteRelated(model Model) error {
 
 func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMap FieldColumnMap) error {
 	for _, e := range exprs {
-		if len(e.Expressions()) > 0 {
+		if len(e.exprs) > 0 {
 			query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
-				err := s.applyExpressionsToQuery(e.Expressions(), q, fieldColumnMap)
+				err := s.applyExpressionsToQuery(e.exprs, q, fieldColumnMap)
 				return q, err
 			})
 
@@ -535,12 +535,12 @@ func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fi
 			}
 		}
 
-		switch e.Type() {
-		case ExpressionTypeAnd:
-			query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.Operand()), e.Value())
+		switch e.t {
+		case expressionTypeAnd:
+			query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
 
-		case ExpressionTypeOr:
-			query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.Operand()), e.Value())
+		case expressionTypeOr:
+			query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
 
 		default:
 			return fmt.Errorf("unknown ExpressionType: %s", e)
