@@ -127,11 +127,65 @@ Now you'll be able to use `FindBy` and `FindOneBy`:
 ```go
 // Find all customers named John.
 customers := []*domain.Customer{}
-store.FindBy(&customers, "NameFirst", "John")
+store.FindBy(&customers, milo.Equal("NameFirst", "John"))
 
 // Find the first customer named John.
 customer := &domain.Customer{}
-store.FindOneBy(customer, "NameFirst", "John")
+store.FindOneBy(customer, milo.Equal("NameFirst", "John"))
+```
+
+You may also use the `And` and `Or` functions to create advanced expressions:
+
+```go
+// Find the first customer named John Smith.
+customer := &domain.Customer{}
+store.FindOneBy(customer, milo.And(milo.Equal("NameFirst", "John"), milo.Equal("NameLast", "Smith"))
+
+// Find all customers with the first name of John or Sally.
+customers := []*domain.Customer{}
+store.FindBy(&customers, milo.Or(milo.Equal("NameFirst", "John"), milo.Equal("NameFirst", "Sally"))
+```
+
+See [expression.go](/expression.go) for a full list of expression functions.
+
+### Transactions
+
+Milo supports database transactions through the `Transaction` method. In the example below, the last names of the customers John and Sally are updated in a single transaction:
+
+```go
+err := store.Transaction(func(txStore *milo.Store) error {
+	var error err
+
+	customer := &domain.Customer{}
+	err = store.FindOneBy(customer, milo.Equal("NameFirst", "John"))
+	if err != nil {
+		return err
+	}
+	customer.NameLast = "Doe"
+
+	customer2 := &domain.Customer{}
+	err = store.FindOneBy(customer2, milo.Equal("NameFirst", "Sally"))
+	if err != nil {
+		return err
+	}
+	customer2.NameLast = "Doe"
+
+	err = store.Save(customer)
+	if err != nil {
+		return err
+	}
+
+	err = store.Save(customer2)
+	if err != nil {
+		return err
+	}
+
+	return nil
+})
+
+if err != nil {
+	// The transaction was rolled back.
+}
 ```
 
 ## Running Tests

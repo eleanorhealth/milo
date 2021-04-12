@@ -1,9 +1,11 @@
 package milo
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
+	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 	"github.com/pkg/errors"
 )
@@ -20,10 +22,19 @@ type ModelConfig struct {
 type EntityModelMap map[reflect.Type]ModelConfig
 
 type Storer interface {
-	Find(entities interface{}) error
-	FindBy(entities interface{}, field interface{}, val interface{}) error
-	FindOneBy(entity interface{}, field interface{}, val interface{}) error
+	Transaction(fn func(txStore *Store) error) error
+
+	FindAll(entities interface{}) error
+
+	FindBy(entities interface{}, exprs ...Expression) error
+	FindByForUpdate(entities interface{}, exprs ...Expression) error
+
+	FindOneBy(entity interface{}, exprs ...Expression) error
+	FindOneByForUpdate(entity interface{}, exprs ...Expression) error
+
 	FindByID(entity interface{}, id interface{}) error
+	FindByIDForUpdate(entity interface{}, id interface{}) error
+
 	Save(entity interface{}) error
 	Delete(entity interface{}) error
 }
@@ -58,7 +69,20 @@ func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
 	}
 }
 
-func (s *Store) Find(entities interface{}) error {
+func (s *Store) Transaction(fn func(txStore *Store) error) error {
+	if _, ok := s.db.(*pg.Tx); ok {
+		return errors.New("already in a transaction")
+	}
+
+	db := s.db.(*pg.DB)
+
+	return db.RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		txStore := NewStore(tx, s.entityModelMap)
+		return fn(txStore)
+	})
+}
+
+func (s *Store) FindAll(entities interface{}) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -112,7 +136,7 @@ func (s *Store) Find(entities interface{}) error {
 	return nil
 }
 
-func (s *Store) FindBy(entities interface{}, field interface{}, val interface{}) error {
+func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -134,26 +158,21 @@ func (s *Store) FindBy(entities interface{}, field interface{}, val interface{})
 		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	var column Column
-	if column, ok = field.(Column); !ok {
-		column, ok = modelConfig.FieldColumnMap[field]
-		if !ok {
-			return fmt.Errorf("unable to find column for field %s on entity type %s", field, entityType.String())
-		}
-	}
-
 	modelsValue := reflect.New(reflect.SliceOf(modelConfig.Model))
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
-	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, column), val)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
 
 	relations := s.db.Model(models).TableModel().Table().Relations
 	for _, relation := range relations {
 		query.Relation(relation.Field.GoName)
 	}
 
-	err := query.Select()
+	err = query.Select()
 	if err != nil {
 		return err
 	}
@@ -175,7 +194,67 @@ func (s *Store) FindBy(entities interface{}, field interface{}, val interface{})
 	return nil
 }
 
-func (s *Store) FindOneBy(entity interface{}, field interface{}, val interface{}) error {
+func (s *Store) FindByForUpdate(entities interface{}, exprs ...Expression) error {
+	entitiesType := reflect.TypeOf(entities)
+
+	if entitiesType.Kind() != reflect.Ptr {
+		return errors.New("must be pointer")
+	}
+
+	if entitiesType.Elem().Kind() != reflect.Slice {
+		return errors.New("must be slice")
+	}
+
+	entityType := entitiesType.Elem().Elem()
+
+	if entityType.Kind() != reflect.Ptr {
+		return errors.New("must be slice of pointers")
+	}
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelsValue := reflect.New(reflect.SliceOf(modelConfig.Model))
+	models := modelsValue.Interface()
+
+	query := s.db.Model(models)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
+
+	relations := s.db.Model(models).TableModel().Table().Relations
+	for _, relation := range relations {
+		query.Relation(relation.Field.GoName)
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+
+	err = query.Select()
+	if err != nil {
+		return err
+	}
+
+	entitiesValue := reflect.ValueOf(entities).Elem()
+
+	for i := 0; i < modelsValue.Elem().Len(); i++ {
+		modelValue := modelsValue.Elem().Index(i)
+		model := modelValue.Interface().(Model)
+
+		entity, err := model.ToEntity()
+		if err != nil {
+			return err
+		}
+
+		entitiesValue.Set(reflect.Append(entitiesValue, reflect.ValueOf(entity)))
+	}
+
+	return nil
+}
+
+func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelConfig, ok := s.entityModelMap[entityType]
@@ -183,27 +262,61 @@ func (s *Store) FindOneBy(entity interface{}, field interface{}, val interface{}
 		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
 	}
 
-	var column Column
-	if column, ok = field.(Column); !ok {
-		column, ok = modelConfig.FieldColumnMap[field]
-		if !ok {
-			return fmt.Errorf("unable to find column for field %s on entity type %s", field, entityType.String())
-		}
-	}
-
 	modelValue := reflect.New(modelConfig.Model.Elem())
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
 
 	relations := s.db.Model(model).TableModel().Table().Relations
 	for _, relation := range relations {
 		query.Relation(relation.Field.GoName)
 	}
 
-	query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, column), val)
+	err = query.First()
+	if err != nil {
+		return err
+	}
 
-	err := query.First()
+	toEntity, err := model.ToEntity()
+	if err != nil {
+		return err
+	}
+
+	entityValue := reflect.ValueOf(entity)
+	reflect.Indirect(entityValue).Set(reflect.Indirect(reflect.ValueOf(toEntity)))
+
+	return nil
+}
+
+func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelConfig.Model.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
+
+	relations := s.db.Model(model).TableModel().Table().Relations
+	for _, relation := range relations {
+		query.Relation(relation.Field.GoName)
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+
+	err = query.First()
 	if err != nil {
 		return err
 	}
@@ -233,7 +346,24 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	query := s.db.Model(model)
 	pk := query.TableModel().Table().PKs[0]
 
-	return s.FindOneBy(entity, Column(pk.SQLName), id)
+	return s.FindOneBy(entity, Equal(Column(pk.SQLName), id))
+}
+
+func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}) error {
+	entityType := reflect.TypeOf(entity)
+
+	modelConfig, ok := s.entityModelMap[entityType]
+	if !ok {
+		return fmt.Errorf("unable to find model config for entity type %s", entityType.String())
+	}
+
+	modelValue := reflect.New(modelConfig.Model.Elem())
+	model := modelValue.Interface().(Model)
+
+	query := s.db.Model(model)
+	pk := query.TableModel().Table().PKs[0]
+
+	return s.FindOneByForUpdate(entity, Equal(Column(pk.SQLName), id))
 }
 
 func (s *Store) Save(entity interface{}) error {
@@ -380,6 +510,43 @@ func (s *Store) deleteRelated(model Model) error {
 			return err
 		}
 
+	}
+
+	return nil
+}
+
+func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMap FieldColumnMap) error {
+	for _, e := range exprs {
+		if len(e.exprs) > 0 {
+
+			query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
+				err := s.applyExpressionsToQuery(e.exprs, q, fieldColumnMap)
+				return q, err
+			})
+
+		} else {
+
+			var column Column
+			var ok bool
+			if column, ok = e.Field().(Column); !ok {
+				column, ok = fieldColumnMap[e.Field()]
+				if !ok {
+					return fmt.Errorf("unable to find column for field %s", e.Field())
+				}
+			}
+
+			switch e.t {
+			case expressionTypeAnd:
+				query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+
+			case expressionTypeOr:
+				query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+
+			default:
+				return fmt.Errorf("unknown expressionType: %s", reflect.TypeOf(e.t).String())
+			}
+
+		}
 	}
 
 	return nil

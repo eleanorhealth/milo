@@ -122,13 +122,13 @@ func (u *userModelPtr) ToEntity() (interface{}, error) {
 
 	if u.Location != nil {
 		entity.Location = &locationEntity{
-			ID:        u.Profile.ID,
+			ID:        u.Location.ID,
 			Latitude:  u.Location.Latitude,
 			Longitude: u.Location.Longitude,
 		}
 	}
 
-	for _, a := range entity.Addresses {
+	for _, a := range u.Addresses {
 		entity.Addresses = append(entity.Addresses, &addressEntity{
 			ID: a.ID,
 
@@ -196,6 +196,7 @@ func TestStore_Pointer(t *testing.T) {
 			Model: reflect.TypeOf(&userModelPtr{}),
 			FieldColumnMap: FieldColumnMap{
 				"NameFirst": "name_first",
+				"NameLast":  "name_last",
 			},
 		},
 	})
@@ -246,50 +247,11 @@ func TestStore_Pointer(t *testing.T) {
 	err = store.Save(user)
 	assert.NoError(err)
 
-	// Find
 	foundUsers := []*userEntityPtr{}
-	err = store.Find(&foundUsers)
+	err = store.FindAll(&foundUsers)
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
-	assert.Equal(user, foundUsers[0])
-
-	// FindBy
-	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, "NameFirst", user.NameFirst)
-	assert.NoError(err)
-	assert.Len(foundUsers, 1)
-
-	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, "NameFirst", "foo")
-	assert.NoError(err)
-	assert.Len(foundUsers, 0)
-
-	// FindOneBy
-	foundUser := &userEntityPtr{}
-	err = store.FindOneBy(foundUser, "NameFirst", user.NameFirst)
-	assert.NoError(err)
-	assert.Equal(user, foundUser)
-
-	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, "NameFirst", "foo")
-	assert.Error(err)
-	assert.NotEqual(user, foundUser)
-
-	// FindByID
-	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
-	assert.NoError(err)
-	assert.Equal(user, foundUser)
-
-	// Delete
-	err = store.Delete(user)
-	assert.NoError(err)
-
-	// Check if the user was deleted.
-	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
-	assert.Error(err)
-	assert.ErrorIs(err, pg.ErrNoRows)
+	assert.Contains(foundUsers, user)
 }
 
 type userEntity struct {
@@ -454,7 +416,7 @@ func TestStore_NonPointer(t *testing.T) {
 	user.Profile.About = "Hey there! My name is Jane."
 	user.Location.Latitude = "71.7979° W"
 	user.Location.Longitude = "21.6940° N"
-	user.Addresses[0].Street = "101 Tremont St"
+	user.Addresses = nil
 
 	err = store.Save(user)
 	assert.NoError(err)
@@ -463,6 +425,216 @@ func TestStore_NonPointer(t *testing.T) {
 	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
+}
+
+func TestStore_Expressions(t *testing.T) {
+	assert := assert.New(t)
+
+	// See docker-compose.yml
+	db := pg.Connect(&pg.Options{
+		Addr:     "localhost:8200",
+		User:     "postgres",
+		Password: "password",
+		Database: "milo",
+	})
+	defer db.Close()
+
+	err := db.Ping(context.Background())
+	assert.NoError(err)
+
+	err = createSchema(db)
+	assert.NoError(err)
+
+	store := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&userEntityPtr{}): ModelConfig{
+			Model: reflect.TypeOf(&userModelPtr{}),
+			FieldColumnMap: FieldColumnMap{
+				"NameFirst": "name_first",
+				"NameLast":  "name_last",
+			},
+		},
+	})
+
+	user := &userEntityPtr{
+		ID:        uuid.New().String(),
+		NameFirst: "John",
+		NameLast:  "Smith",
+
+		Profile: &profileEntity{
+			ID:            uuid.New().String(),
+			About:         "Hi! I'm John.",
+			FavoriteColor: "blue",
+		},
+
+		Location: &locationEntity{
+			ID:        uuid.New().String(),
+			Latitude:  "71.0589° W",
+			Longitude: "42.3601° N",
+		},
+
+		Addresses: []*addressEntity{
+			{
+				ID:     uuid.New().String(),
+				Street: "131 Tremont St",
+				City:   "Boston",
+				State:  "MA",
+				Zip:    "02108",
+			},
+		},
+	}
+
+	err = store.Save(user)
+	assert.NoError(err)
+
+	user2 := &userEntityPtr{
+		ID:        uuid.New().String(),
+		NameFirst: "Jane",
+		NameLast:  "Doe",
+
+		Profile: &profileEntity{
+			ID:            uuid.New().String(),
+			About:         "Hello there! My name is Jane.",
+			FavoriteColor: "green",
+		},
+
+		Location: nil,
+
+		Addresses: nil,
+	}
+
+	err = store.Save(user2)
+	assert.NoError(err)
+
+	user3 := &userEntityPtr{
+		ID:        uuid.New().String(),
+		NameFirst: "Sally",
+		NameLast:  "Smith",
+
+		Profile: &profileEntity{
+			ID:            uuid.New().String(),
+			About:         "My name is Sally Smith.",
+			FavoriteColor: "yellow",
+		},
+
+		Location: nil,
+
+		Addresses: []*addressEntity{
+			{
+				ID:     uuid.New().String(),
+				Street: "13 School St",
+				City:   "Boston",
+				State:  "MA",
+				Zip:    "02108",
+			},
+		},
+	}
+
+	err = store.Save(user3)
+	assert.NoError(err)
+
+	// FindAll.
+	foundUsers := []*userEntityPtr{}
+	err = store.FindAll(&foundUsers)
+	assert.NoError(err)
+	assert.Len(foundUsers, 3)
+	assert.Contains(foundUsers, user)
+	assert.Contains(foundUsers, user2)
+	assert.Contains(foundUsers, user3)
+
+	// FindBy (one field).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
+
+	// FindBy (multiple fields).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
+
+	// FindBy (multiple fields, And).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
+
+	// FindBy (multiple fields, Or).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Or(Equal("NameFirst", user.NameFirst), Equal("NameFirst", user2.NameFirst)))
+	assert.NoError(err)
+	assert.Len(foundUsers, 2)
+	assert.Contains(foundUsers, user)
+	assert.Contains(foundUsers, user2)
+
+	// FindBy (multiple fields, nested).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Or(And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)), Equal("NameFirst", user3.NameFirst)))
+	assert.NoError(err)
+	assert.Len(foundUsers, 2)
+	assert.Contains(foundUsers, user)
+	assert.Contains(foundUsers, user3)
+
+	// FindBy (one field, no match).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, Equal("NameFirst", "foo"))
+	assert.NoError(err)
+	assert.Len(foundUsers, 0)
+
+	// FindOneBy (one field).
+	foundUser := &userEntityPtr{}
+	err = store.FindOneBy(foundUser, Equal("NameFirst", user.NameFirst))
+	assert.NoError(err)
+	assert.Equal(user, foundUser)
+
+	// FindOneBy (one field, no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindOneBy(foundUser, Equal("NameFirst", "foo"))
+	assert.Error(err)
+	assert.NotEqual(user, foundUser)
+
+	// FindByID.
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
+	assert.NoError(err)
+	assert.Equal(user, foundUser)
+
+	// Transaction (FindByIDForUpdate and Save).
+	err = store.Transaction(func(txStore *Store) error {
+		foundUser = &userEntityPtr{}
+		err = txStore.FindByIDForUpdate(foundUser, user.ID)
+		assert.NoError(err)
+		assert.Equal(user, foundUser)
+
+		foundUser.NameFirst = "Marcia"
+
+		err = txStore.Save(foundUser)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	assert.NoError(err)
+
+	// Check if the transaction made the expected change.
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
+	assert.NoError(err)
+	assert.Equal("Marcia", foundUser.NameFirst)
+
+	// Delete.
+	err = store.Delete(user)
+	assert.NoError(err)
+
+	// Check if the user was deleted.
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, user.ID)
+	assert.Error(err)
+	assert.ErrorIs(err, pg.ErrNoRows)
 }
 
 func createSchema(db *pg.DB) error {
