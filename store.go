@@ -266,15 +266,14 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
 
 	relations := s.db.Model(model).TableModel().Table().Relations
 	for _, relation := range relations {
 		query.Relation(relation.Field.GoName)
-	}
-
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
-	if err != nil {
-		return errors.Wrap(err, "applying expressions to query")
 	}
 
 	err = query.First()
@@ -305,15 +304,14 @@ func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) erro
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	if err != nil {
+		return errors.Wrap(err, "applying expressions to query")
+	}
 
 	relations := s.db.Model(model).TableModel().Table().Relations
 	for _, relation := range relations {
 		query.Relation(relation.Field.GoName)
-	}
-
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
-	if err != nil {
-		return errors.Wrap(err, "applying expressions to query")
 	}
 
 	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
