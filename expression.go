@@ -11,11 +11,11 @@ const (
 	OpLte      Op = "<="
 )
 
-type ExprType string
+type ExpressionListType string
 
 const (
-	ExprTypeAnd ExprType = "AND"
-	ExprTypeOr  ExprType = "OR"
+	ExpressionTypeAnd ExpressionListType = "AND"
+	ExpressionTypeOr  ExpressionListType = "OR"
 )
 
 type Expression interface {
@@ -26,7 +26,7 @@ type Expression interface {
 
 type ExpressionList interface {
 	Expression
-	Type() ExprType
+	Type() ExpressionListType
 	Expressions() []Expression
 }
 
@@ -50,11 +50,11 @@ func (e expr) Value() interface{} {
 
 type exprList struct {
 	expr
-	t     ExprType
+	t     ExpressionListType
 	exprs []Expression
 }
 
-func (e exprList) Type() ExprType {
+func (e exprList) Type() ExpressionListType {
 	return e.t
 }
 
@@ -63,11 +63,11 @@ func (e exprList) Expressions() []Expression {
 }
 
 func And(exprs ...Expression) ExpressionList {
-	return exprList{t: ExprTypeAnd, exprs: exprs}
+	return exprList{t: ExpressionTypeAnd, exprs: exprs}
 }
 
 func Or(exprs ...Expression) ExpressionList {
-	return exprList{t: ExprTypeOr, exprs: exprs}
+	return exprList{t: ExpressionTypeOr, exprs: exprs}
 }
 
 func Equal(field interface{}, value interface{}) Expression {

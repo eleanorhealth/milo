@@ -24,7 +24,7 @@ func TestAnd(t *testing.T) {
 
 	actual := And(exprs...)
 
-	assert.Equal(exprList{t: ExprTypeAnd, exprs: exprs}, actual)
+	assert.Equal(exprList{t: ExpressionTypeAnd, exprs: exprs}, actual)
 }
 
 func TestOr(t *testing.T) {
@@ -45,7 +45,7 @@ func TestOr(t *testing.T) {
 
 	actual := Or(exprs...)
 
-	assert.Equal(exprList{t: ExprTypeOr, exprs: exprs}, actual)
+	assert.Equal(exprList{t: ExpressionTypeOr, exprs: exprs}, actual)
 }
 
 func TestEqual(t *testing.T) {

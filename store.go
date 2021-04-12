@@ -520,13 +520,13 @@ func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fi
 		switch e := e.(type) {
 		case ExpressionList:
 			switch e.Type() {
-			case ExprTypeAnd:
+			case ExpressionTypeAnd:
 				query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 					err := s.applyExpressionsToQuery(e.Expressions(), q, fieldColumnMap)
 					return q, err
 				})
 
-			case ExprTypeOr:
+			case ExpressionTypeOr:
 				query.WhereOrGroup(func(q *orm.Query) (*orm.Query, error) {
 					err := s.applyExpressionsToQuery(e.Expressions(), q, fieldColumnMap)
 					return q, err
