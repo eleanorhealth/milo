@@ -11,11 +11,11 @@ const (
 	OpLte      Op = "<="
 )
 
-type expressionType string
+type expressionType int
 
 const (
-	expressionTypeAnd expressionType = "AND"
-	expressionTypeOr  expressionType = "OR"
+	expressionTypeAnd expressionType = iota
+	expressionTypeOr
 )
 
 type Expression struct {

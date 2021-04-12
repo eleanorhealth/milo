@@ -543,7 +543,7 @@ func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fi
 				query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
 
 			default:
-				return fmt.Errorf("unknown ExpressionType: %s", e)
+				return fmt.Errorf("unknown expressionType: %s", reflect.TypeOf(e.t).String())
 			}
 
 		}
