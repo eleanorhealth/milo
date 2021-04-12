@@ -546,6 +546,7 @@ func TestStore_Expressions(t *testing.T) {
 	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
 
 	// FindBy (multiple fields).
 	foundUsers = []*userEntityPtr{}
@@ -608,7 +609,7 @@ func TestStore_Expressions(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(user, foundUser)
 
-		foundUser.NameFirst = "Sally"
+		foundUser.NameFirst = "Marcia"
 
 		err = txStore.Save(foundUser)
 		if err != nil {
@@ -623,7 +624,7 @@ func TestStore_Expressions(t *testing.T) {
 	foundUser = &userEntityPtr{}
 	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
-	assert.Equal("Sally", foundUser.NameFirst)
+	assert.Equal("Marcia", foundUser.NameFirst)
 
 	// Delete.
 	err = store.Delete(user)
