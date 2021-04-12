@@ -247,7 +247,6 @@ func TestStore_Pointer(t *testing.T) {
 	err = store.Save(user)
 	assert.NoError(err)
 
-	// FindAll.
 	foundUsers := []*userEntityPtr{}
 	err = store.FindAll(&foundUsers)
 	assert.NoError(err)
@@ -417,12 +416,11 @@ func TestStore_NonPointer(t *testing.T) {
 	user.Profile.About = "Hey there! My name is Jane."
 	user.Location.Latitude = "71.7979° W"
 	user.Location.Longitude = "21.6940° N"
-	user.Addresses[0].Street = "101 Tremont St"
+	user.Addresses = nil
 
 	err = store.Save(user)
 	assert.NoError(err)
 
-	// FindByID.
 	foundUser := &userEntity{}
 	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
