@@ -278,6 +278,10 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 
 	err = query.First()
 	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return ErrNotFound
+		}
+
 		return err
 	}
 
@@ -318,6 +322,10 @@ func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) erro
 
 	err = query.First()
 	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return ErrNotFound
+		}
+
 		return err
 	}
 
