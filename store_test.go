@@ -594,6 +594,14 @@ func TestStore_Expressions(t *testing.T) {
 	foundUser = &userEntityPtr{}
 	err = store.FindOneBy(foundUser, Equal("NameFirst", "foo"))
 	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
+	assert.NotEqual(user, foundUser)
+
+	// FindOneByForUpdate (one field, no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindOneBy(foundUser, Equal("NameFirst", "foo"))
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
 
 	// FindByID.
@@ -601,6 +609,18 @@ func TestStore_Expressions(t *testing.T) {
 	err = store.FindByID(foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
+
+	// FindByID (no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindByID(foundUser, "foo")
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
+
+	// FindByIDForUpdate (no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindByIDForUpdate(foundUser, "foo")
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
 
 	// Transaction (FindByIDForUpdate and Save).
 	err = store.Transaction(func(txStore *Store) error {
@@ -634,7 +654,7 @@ func TestStore_Expressions(t *testing.T) {
 	foundUser = &userEntityPtr{}
 	err = store.FindByID(foundUser, user.ID)
 	assert.Error(err)
-	assert.ErrorIs(err, pg.ErrNoRows)
+	assert.ErrorIs(err, ErrNotFound)
 }
 
 func createSchema(db *pg.DB) error {
