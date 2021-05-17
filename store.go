@@ -22,7 +22,7 @@ type ModelConfig struct {
 type EntityModelMap map[reflect.Type]ModelConfig
 
 type Storer interface {
-	Transaction(fn func(txStore *Store) error) error
+	Transaction(fn func(txStore Storer) error) error
 
 	FindAll(entities interface{}) error
 
@@ -69,7 +69,7 @@ func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
 	}
 }
 
-func (s *Store) Transaction(fn func(txStore *Store) error) error {
+func (s *Store) Transaction(fn func(txStore Storer) error) error {
 	if _, ok := s.db.(*pg.Tx); ok {
 		return errors.New("already in a transaction")
 	}
