@@ -623,7 +623,7 @@ func TestStore_Expressions(t *testing.T) {
 	assert.ErrorIs(err, ErrNotFound)
 
 	// Transaction (FindByIDForUpdate and Save).
-	err = store.Transaction(func(txStore *Store) error {
+	err = store.Transaction(func(txStore Storer) error {
 		foundUser = &userEntityPtr{}
 		err = txStore.FindByIDForUpdate(foundUser, user.ID)
 		assert.NoError(err)
