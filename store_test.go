@@ -8,6 +8,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/go-pg/pg/v10/orm"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -655,6 +656,12 @@ func TestStore_Expressions(t *testing.T) {
 	err = store.FindByID(foundUser, user.ID)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
+
+	// Transaction (error).
+	err = store.Transaction(func(txStore Storer) error {
+		return errors.New("test")
+	})
+	assert.Error(err)
 }
 
 func createSchema(db *pg.DB) error {
