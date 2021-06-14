@@ -253,6 +253,7 @@ func TestStore_Pointer(t *testing.T) {
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
+
 }
 
 type userEntity struct {
@@ -664,12 +665,102 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Error(err)
 }
 
+type beforeSaveEntity struct {
+	ID string
+
+	beforeSaveFunc func(store Storer, entity interface{}) error
+}
+
+type beforeSaveModel struct {
+	ID string
+
+	beforeSaveFunc func(store Storer, entity interface{}) error
+}
+
+func (b *beforeSaveModel) FromEntity(e interface{}) error {
+	b.ID = e.(*beforeSaveEntity).ID
+
+	b.beforeSaveFunc = e.(*beforeSaveEntity).beforeSaveFunc
+
+	return nil
+}
+
+func (b *beforeSaveModel) ToEntity() (interface{}, error) {
+	return &beforeSaveEntity{
+		ID: b.ID,
+	}, nil
+}
+
+func (b *beforeSaveModel) BeforeSave(store Storer, entity interface{}) error {
+	return b.beforeSaveFunc(store, entity)
+}
+
+func TestStore_BeforeSave(t *testing.T) {
+	assert := assert.New(t)
+
+	// See docker-compose.yml
+	db := pg.Connect(&pg.Options{
+		Addr:     "localhost:8200",
+		User:     "postgres",
+		Password: "password",
+		Database: "milo",
+	})
+	defer db.Close()
+
+	err := db.Ping(context.Background())
+	assert.NoError(err)
+
+	err = createSchema(db)
+	assert.NoError(err)
+
+	store := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&beforeSaveEntity{}): ModelConfig{
+			Model:          reflect.TypeOf(&beforeSaveModel{}),
+			FieldColumnMap: FieldColumnMap{},
+		},
+	})
+
+	// BeforeSave success
+	called := false
+
+	beforeSave := &beforeSaveEntity{
+		ID: "foo",
+		beforeSaveFunc: func(store Storer, entity interface{}) error {
+			called = true
+			return nil
+		},
+	}
+
+	err = store.Save(beforeSave)
+	assert.NoError(err)
+
+	assert.True(called)
+
+	// BeforeSave error
+	called = false
+
+	beforeSave = &beforeSaveEntity{
+		ID: "foo",
+		beforeSaveFunc: func(store Storer, entity interface{}) error {
+			called = true
+			return errors.New("test")
+		},
+	}
+
+	err = store.Save(beforeSave)
+	assert.Error(err)
+
+	assert.True(called)
+
+}
+
 func createSchema(db *pg.DB) error {
 	models := []interface{}{
 		(*userModelPtr)(nil),
 		(*profileModel)(nil),
 		(*locationModel)(nil),
 		(*addressModel)(nil),
+		(*beforeSaveModel)(nil),
 	}
 
 	for _, model := range models {

@@ -70,13 +70,11 @@ func NewStore(db orm.DB, entityModelMap EntityModelMap) *Store {
 }
 
 func (s *Store) Transaction(fn func(txStore Storer) error) error {
-	if _, ok := s.db.(*pg.Tx); ok {
+	if s.inTransaction() {
 		return errors.New("already in a transaction")
 	}
 
-	db := s.db.(*pg.DB)
-
-	return db.RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+	return s.db.(*pg.DB).RunInTransaction(context.Background(), func(tx *pg.Tx) error {
 		txStore := NewStore(tx, s.entityModelMap)
 		return fn(txStore)
 	})
@@ -162,7 +160,7 @@ func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	err := applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
 	}
@@ -220,7 +218,7 @@ func (s *Store) FindByForUpdate(entities interface{}, exprs ...Expression) error
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	err := applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
 	}
@@ -266,7 +264,7 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	err := applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
 	}
@@ -308,7 +306,7 @@ func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) erro
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
-	err := s.applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
+	err := applyExpressionsToQuery(exprs, query, modelConfig.FieldColumnMap)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
 	}
@@ -390,7 +388,27 @@ func (s *Store) Save(entity interface{}) error {
 		return errors.Wrapf(err, "calling FromEntity on %s", modelConfig.Model.Elem().String())
 	}
 
-	exists, err := s.db.Model(model).WherePK().Exists()
+	var tx *pg.Tx
+
+	if s.inTransaction() {
+		tx = s.db.(*pg.Tx)
+	} else {
+		tx, err = s.db.(*pg.DB).Begin()
+		if err != nil {
+			return errors.Wrap(err, "beginning transaction")
+		}
+
+		defer tx.Rollback()
+	}
+
+	if model, ok := model.(Hook); ok {
+		err = model.BeforeSave(s, entity)
+		if err != nil {
+			return errors.Wrap(err, "calling BeforeSave")
+		}
+	}
+
+	exists, err := tx.Model(model).WherePK().Exists()
 	if err != nil {
 		return err
 	}
@@ -398,14 +416,21 @@ func (s *Store) Save(entity interface{}) error {
 	// Insert
 
 	if !exists {
-		_, err := s.db.Model(model).Insert()
+		_, err := tx.Model(model).Insert()
 		if err != nil {
 			return err
 		}
 
-		err = s.insertRelated(model)
+		err = insertRelated(tx, model)
 		if err != nil {
 			return err
+		}
+
+		if !s.inTransaction() {
+			err = tx.Commit()
+			if err != nil {
+				return errors.Wrap(err, "committing transaction")
+			}
 		}
 
 		return nil
@@ -413,19 +438,26 @@ func (s *Store) Save(entity interface{}) error {
 
 	// Update
 
-	_, err = s.db.Model(model).WherePK().Update()
+	_, err = tx.Model(model).WherePK().Update()
 	if err != nil {
 		return err
 	}
 
-	err = s.deleteRelated(model)
+	err = deleteRelated(tx, model)
 	if err != nil {
 		return err
 	}
 
-	err = s.insertRelated(model)
+	err = insertRelated(tx, model)
 	if err != nil {
 		return err
+	}
+
+	if !s.inTransaction() {
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrap(err, "committing transaction")
+		}
 	}
 
 	return nil
@@ -447,23 +479,43 @@ func (s *Store) Delete(entity interface{}) error {
 		return errors.Wrapf(err, "calling FromEntity on %s", modelConfig.Model.Elem().String())
 	}
 
-	_, err = s.db.Model(model).WherePK().Delete()
+	var tx *pg.Tx
+
+	if s.inTransaction() {
+		tx = s.db.(*pg.Tx)
+	} else {
+		tx, err = s.db.(*pg.DB).Begin()
+		if err != nil {
+			return errors.Wrap(err, "beginning transaction")
+		}
+
+		defer tx.Rollback()
+	}
+
+	_, err = tx.Model(model).WherePK().Delete()
 	if err != nil {
 		return err
 	}
 
-	err = s.deleteRelated(model)
+	err = deleteRelated(tx, model)
 	if err != nil {
 		return err
+	}
+
+	if !s.inTransaction() {
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrap(err, "committing transaction")
+		}
 	}
 
 	return nil
 }
 
-func (s *Store) insertRelated(model Model) error {
+func insertRelated(db orm.DB, model Model) error {
 	modelValue := reflect.ValueOf(model)
 
-	relations := s.db.Model(model).TableModel().Table().Relations
+	relations := db.Model(model).TableModel().Table().Relations
 	for _, relation := range relations {
 
 		// Many to many relationships are not supported.
@@ -483,7 +535,7 @@ func (s *Store) insertRelated(model Model) error {
 			relatedModelField = relatedModelField.Addr()
 		}
 
-		_, err := s.db.Model(relatedModelField.Interface()).Insert()
+		_, err := db.Model(relatedModelField.Interface()).Insert()
 		if err != nil {
 			return err
 		}
@@ -493,10 +545,10 @@ func (s *Store) insertRelated(model Model) error {
 	return nil
 }
 
-func (s *Store) deleteRelated(model Model) error {
+func deleteRelated(db orm.DB, model Model) error {
 	modelValue := reflect.ValueOf(model)
 
-	relations := s.db.Model(model).TableModel().Table().Relations
+	relations := db.Model(model).TableModel().Table().Relations
 	for _, relation := range relations {
 
 		relatedModelFieldValue := reflect.New(relation.Field.Type)
@@ -504,7 +556,7 @@ func (s *Store) deleteRelated(model Model) error {
 			relatedModelFieldValue = relatedModelFieldValue.Addr()
 		}
 
-		deleteQuery := s.db.Model(relatedModelFieldValue.Interface())
+		deleteQuery := db.Model(relatedModelFieldValue.Interface())
 
 		for i, fk := range relation.JoinFKs {
 			baseFK := relation.BaseFKs[i]
@@ -523,12 +575,12 @@ func (s *Store) deleteRelated(model Model) error {
 	return nil
 }
 
-func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMap FieldColumnMap) error {
+func applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMap FieldColumnMap) error {
 	for _, e := range exprs {
 		if len(e.exprs) > 0 {
 
 			query.WhereGroup(func(q *orm.Query) (*orm.Query, error) {
-				err := s.applyExpressionsToQuery(e.exprs, q, fieldColumnMap)
+				err := applyExpressionsToQuery(e.exprs, q, fieldColumnMap)
 				return q, err
 			})
 
@@ -558,4 +610,12 @@ func (s *Store) applyExpressionsToQuery(exprs []Expression, query *orm.Query, fi
 	}
 
 	return nil
+}
+
+func (s *Store) inTransaction() bool {
+	if _, ok := s.db.(*pg.Tx); ok {
+		return true
+	}
+
+	return false
 }
