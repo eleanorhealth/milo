@@ -402,7 +402,7 @@ func (s *Store) Save(entity interface{}) error {
 	}
 
 	if model, ok := model.(Hook); ok {
-		err = model.BeforeSave(s, entity)
+		err = model.BeforeSave(NewStore(tx, s.entityModelMap), entity)
 		if err != nil {
 			return errors.Wrap(err, "calling BeforeSave")
 		}
