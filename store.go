@@ -605,12 +605,22 @@ func applyExpressionsToQuery(exprs []Expression, query *orm.Query, fieldColumnMa
 				}
 			}
 
+			var condition string
+			var params []interface{}
+
+			if e.op == OpIsNull || e.op == OpIsNotNull {
+				condition = fmt.Sprintf("%s.%s %s", query.TableModel().Table().Alias, column, e.op)
+			} else {
+				condition = fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op)
+				params = append(params, e.Value())
+			}
+
 			switch e.t {
 			case expressionTypeAnd:
-				query.Where(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+				query.Where(condition, params...)
 
 			case expressionTypeOr:
-				query.WhereOr(fmt.Sprintf("%s.%s %s ?", query.TableModel().Table().Alias, column, e.op), e.Value())
+				query.WhereOr(condition, params...)
 
 			default:
 				return fmt.Errorf("unknown expressionType: %s", reflect.TypeOf(e.t).String())

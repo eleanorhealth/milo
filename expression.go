@@ -3,12 +3,14 @@ package milo
 type Op string
 
 const (
-	OpEqual    Op = "="
-	OpNotEqual Op = "!="
-	OpGt       Op = ">"
-	OpLt       Op = "<"
-	OpGte      Op = ">="
-	OpLte      Op = "<="
+	OpIsNull    Op = "IS NULL"
+	OpIsNotNull Op = "IS NOT NULL"
+	OpEqual     Op = "="
+	OpNotEqual  Op = "!="
+	OpGt        Op = ">"
+	OpLt        Op = "<"
+	OpGte       Op = ">="
+	OpLte       Op = "<="
 )
 
 type expressionType int
@@ -106,6 +108,24 @@ func Lte(field interface{}, value interface{}) Expression {
 		field: field,
 		op:    OpLte,
 		value: value,
+		t:     expressionTypeAnd,
+	}
+}
+
+func IsNull(field interface{}) Expression {
+	return Expression{
+		field: field,
+		op:    OpIsNull,
+		value: nil,
+		t:     expressionTypeAnd,
+	}
+}
+
+func IsNotNull(field interface{}) Expression {
+	return Expression{
+		field: field,
+		op:    OpIsNotNull,
+		value: nil,
 		t:     expressionTypeAnd,
 	}
 }
