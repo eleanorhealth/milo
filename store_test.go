@@ -618,16 +618,22 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
-	// FindByIDForUpdate (no match).
+	// FindByIDForUpdate (don't skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindByIDForUpdate(foundUser, "foo")
+	err = store.FindByIDForUpdate(foundUser, "foo", false)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
-	// Transaction (FindByIDForUpdate and Save).
+	// FindByIDForUpdate (skip locked, no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindByIDForUpdate(foundUser, "foo", true)
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
+
+	// Transaction (FindByIDForUpdate, skip locked, and Save).
 	err = store.Transaction(func(txStore Storer) error {
 		foundUser = &userEntityPtr{}
-		err = txStore.FindByIDForUpdate(foundUser, user.ID)
+		err = txStore.FindByIDForUpdate(foundUser, user.ID, true)
 		assert.NoError(err)
 		assert.Equal(user, foundUser)
 
