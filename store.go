@@ -27,13 +27,13 @@ type Storer interface {
 	FindAll(entities interface{}) error
 
 	FindBy(entities interface{}, exprs ...Expression) error
-	FindByForUpdate(entities interface{}, exprs ...Expression) error
+	FindByForUpdate(entities interface{}, skipLocked bool, exprs ...Expression) error
 
 	FindOneBy(entity interface{}, exprs ...Expression) error
-	FindOneByForUpdate(entity interface{}, exprs ...Expression) error
+	FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ...Expression) error
 
 	FindByID(entity interface{}, id interface{}) error
-	FindByIDForUpdate(entity interface{}, id interface{}) error
+	FindByIDForUpdate(entity interface{}, id interface{}, skipLocked bool) error
 
 	Save(entity interface{}) error
 	Delete(entity interface{}) error
@@ -192,7 +192,7 @@ func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	return nil
 }
 
-func (s *Store) FindByForUpdate(entities interface{}, exprs ...Expression) error {
+func (s *Store) FindByForUpdate(entities interface{}, skipLocked bool, exprs ...Expression) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -228,7 +228,12 @@ func (s *Store) FindByForUpdate(entities interface{}, exprs ...Expression) error
 		query.Relation(relation.Field.GoName)
 	}
 
-	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+	var skipLockedSQL string
+	if skipLocked {
+		skipLockedSQL = " SKIP LOCKED"
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s%s", query.TableModel().Table().Alias, skipLockedSQL))
 
 	err = query.Select()
 	if err != nil {
@@ -294,7 +299,7 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	return nil
 }
 
-func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) error {
+func (s *Store) FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ...Expression) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelConfig, ok := s.entityModelMap[entityType]
@@ -316,7 +321,12 @@ func (s *Store) FindOneByForUpdate(entity interface{}, exprs ...Expression) erro
 		query.Relation(relation.Field.GoName)
 	}
 
-	query.For(fmt.Sprintf("UPDATE OF %s", query.TableModel().Table().Alias))
+	var skipLockedSQL string
+	if skipLocked {
+		skipLockedSQL = " SKIP LOCKED"
+	}
+
+	query.For(fmt.Sprintf("UPDATE OF %s%s", query.TableModel().Table().Alias, skipLockedSQL))
 
 	err = query.First()
 	if err != nil {
@@ -355,7 +365,7 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	return s.FindOneBy(entity, Equal(Column(pk.SQLName), id))
 }
 
-func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}) error {
+func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}, skipLocked bool) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelConfig, ok := s.entityModelMap[entityType]
@@ -369,7 +379,7 @@ func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}) error {
 	query := s.db.Model(model)
 	pk := query.TableModel().Table().PKs[0]
 
-	return s.FindOneByForUpdate(entity, Equal(Column(pk.SQLName), id))
+	return s.FindOneByForUpdate(entity, skipLocked, Equal(Column(pk.SQLName), id))
 }
 
 func (s *Store) Save(entity interface{}) error {

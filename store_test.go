@@ -550,6 +550,20 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
+	// FindByForUpdate (don't skip locked, one field).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindByForUpdate(&foundUsers, false, Equal("NameFirst", user.NameFirst))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
+
+	// FindByForUpdate (skip locked, one field).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindByForUpdate(&foundUsers, true, Equal("NameFirst", user.NameFirst))
+	assert.NoError(err)
+	assert.Len(foundUsers, 1)
+	assert.Contains(foundUsers, user)
+
 	// FindBy (multiple fields).
 	foundUsers = []*userEntityPtr{}
 	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast))
@@ -599,9 +613,16 @@ func TestStore_Expressions(t *testing.T) {
 	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
 
-	// FindOneByForUpdate (one field, no match).
+	// FindOneByForUpdate (one field, don't skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, Equal("NameFirst", "foo"))
+	err = store.FindOneByForUpdate(foundUser, false, Equal("NameFirst", "foo"))
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
+	assert.NotEqual(user, foundUser)
+
+	// FindOneByForUpdate (one field, skip locked, no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindOneByForUpdate(foundUser, true, Equal("NameFirst", "foo"))
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
@@ -618,16 +639,22 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
-	// FindByIDForUpdate (no match).
+	// FindByIDForUpdate (don't skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindByIDForUpdate(foundUser, "foo")
+	err = store.FindByIDForUpdate(foundUser, "foo", false)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
-	// Transaction (FindByIDForUpdate and Save).
+	// FindByIDForUpdate (skip locked, no match).
+	foundUser = &userEntityPtr{}
+	err = store.FindByIDForUpdate(foundUser, "foo", true)
+	assert.Error(err)
+	assert.ErrorIs(err, ErrNotFound)
+
+	// Transaction (FindByIDForUpdate, skip locked, and Save).
 	err = store.Transaction(func(txStore Storer) error {
 		foundUser = &userEntityPtr{}
-		err = txStore.FindByIDForUpdate(foundUser, user.ID)
+		err = txStore.FindByIDForUpdate(foundUser, user.ID, true)
 		assert.NoError(err)
 		assert.Equal(user, foundUser)
 
