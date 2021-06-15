@@ -690,6 +690,26 @@ func TestStore_Expressions(t *testing.T) {
 		return errors.New("test")
 	})
 	assert.Error(err)
+
+	user3.NameLast = ""
+	err = store.Save(user3)
+	assert.NoError(err)
+
+	// FindOneBy (IsNull).
+	foundUser = &userEntityPtr{}
+	err = store.FindOneBy(foundUser, IsNull("NameLast"))
+	assert.NoError(err)
+	assert.Equal(user3, foundUser)
+
+	// FindOneBy (IsNotNull).
+	foundUsers = []*userEntityPtr{}
+	err = store.FindBy(&foundUsers, IsNotNull("NameLast"))
+	assert.NoError(err)
+	// There are 3 users:
+	// User 1 has been deleted.
+	// User 2 has a first and last name.
+	// User 3 has a NULL last name.
+	assert.Len(foundUsers, 1)
 }
 
 type beforeSaveEntity struct {
