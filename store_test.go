@@ -230,7 +230,7 @@ func TestStore_Pointer(t *testing.T) {
 		},
 	}
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	user.NameFirst = "Jane"
@@ -240,12 +240,12 @@ func TestStore_Pointer(t *testing.T) {
 	user.Location = nil
 	user.Addresses[0].Street = "101 Tremont St"
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	user.Addresses = nil
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	foundUsers := []*userEntityPtr{}
@@ -409,7 +409,7 @@ func TestStore_NonPointer(t *testing.T) {
 		},
 	}
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	user.NameFirst = "Jane"
@@ -420,7 +420,7 @@ func TestStore_NonPointer(t *testing.T) {
 	user.Location.Longitude = "21.6940° N"
 	user.Addresses = nil
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	foundUser := &userEntity{}
@@ -485,7 +485,7 @@ func TestStore_Expressions(t *testing.T) {
 		},
 	}
 
-	err = store.Save(user)
+	err = store.Save(context.Background(), user)
 	assert.NoError(err)
 
 	user2 := &userEntityPtr{
@@ -504,7 +504,7 @@ func TestStore_Expressions(t *testing.T) {
 		Addresses: nil,
 	}
 
-	err = store.Save(user2)
+	err = store.Save(context.Background(), user2)
 	assert.NoError(err)
 
 	user3 := &userEntityPtr{
@@ -531,7 +531,7 @@ func TestStore_Expressions(t *testing.T) {
 		},
 	}
 
-	err = store.Save(user3)
+	err = store.Save(context.Background(), user3)
 	assert.NoError(err)
 
 	// FindAll.
@@ -660,7 +660,7 @@ func TestStore_Expressions(t *testing.T) {
 
 		foundUser.NameFirst = "Marcia"
 
-		err = txStore.Save(foundUser)
+		err = txStore.Save(context.Background(), foundUser)
 		if err != nil {
 			return err
 		}
@@ -676,7 +676,7 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Equal("Marcia", foundUser.NameFirst)
 
 	// Delete.
-	err = store.Delete(user)
+	err = store.Delete(context.Background(), user)
 	assert.NoError(err)
 
 	// Check if the user was deleted.
@@ -692,7 +692,7 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Error(err)
 
 	user3.NameLast = ""
-	err = store.Save(user3)
+	err = store.Save(context.Background(), user3)
 	assert.NoError(err)
 
 	// FindOneBy (IsNull).
@@ -715,13 +715,13 @@ func TestStore_Expressions(t *testing.T) {
 type beforeSaveEntity struct {
 	ID string
 
-	beforeSaveFunc func(store Storer, entity interface{}) error
+	beforeSaveFunc func(ctx context.Context, store Storer, entity interface{}) error
 }
 
 type beforeSaveModel struct {
 	ID string
 
-	beforeSaveFunc func(store Storer, entity interface{}) error
+	beforeSaveFunc func(ctx context.Context, store Storer, entity interface{}) error
 }
 
 func (b *beforeSaveModel) FromEntity(e interface{}) error {
@@ -738,8 +738,8 @@ func (b *beforeSaveModel) ToEntity() (interface{}, error) {
 	}, nil
 }
 
-func (b *beforeSaveModel) BeforeSave(store Storer, entity interface{}) error {
-	return b.beforeSaveFunc(store, entity)
+func (b *beforeSaveModel) BeforeSave(ctx context.Context, store Storer, entity interface{}) error {
+	return b.beforeSaveFunc(ctx, store, entity)
 }
 
 func TestStore_BeforeSave(t *testing.T) {
@@ -772,13 +772,13 @@ func TestStore_BeforeSave(t *testing.T) {
 
 	beforeSave := &beforeSaveEntity{
 		ID: "foo",
-		beforeSaveFunc: func(store Storer, entity interface{}) error {
+		beforeSaveFunc: func(ctx context.Context, store Storer, entity interface{}) error {
 			called = true
 			return nil
 		},
 	}
 
-	err = store.Save(beforeSave)
+	err = store.Save(context.Background(), beforeSave)
 	assert.NoError(err)
 
 	assert.True(called)
@@ -788,13 +788,13 @@ func TestStore_BeforeSave(t *testing.T) {
 
 	beforeSave = &beforeSaveEntity{
 		ID: "foo",
-		beforeSaveFunc: func(store Storer, entity interface{}) error {
+		beforeSaveFunc: func(ctx context.Context, store Storer, entity interface{}) error {
 			called = true
 			return errors.New("test")
 		},
 	}
 
-	err = store.Save(beforeSave)
+	err = store.Save(context.Background(), beforeSave)
 	assert.Error(err)
 
 	assert.True(called)
