@@ -9,4 +9,5 @@ type Model interface {
 
 type Hook interface {
 	BeforeSave(ctx context.Context, store Storer, entity interface{}) error
+	BeforeDelete(ctx context.Context, store Storer, entity interface{}) error
 }

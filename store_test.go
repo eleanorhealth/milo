@@ -712,37 +712,53 @@ func TestStore_Expressions(t *testing.T) {
 	assert.Len(foundUsers, 1)
 }
 
-type beforeSaveEntity struct {
+type hookEntity struct {
 	ID string
 
-	beforeSaveFunc func(ctx context.Context, store Storer, entity interface{}) error
+	beforeSaveFunc   func(ctx context.Context, store Storer, entity interface{}) error
+	beforeDeleteFunc func(ctx context.Context, store Storer, entity interface{}) error
 }
 
-type beforeSaveModel struct {
-	ID string
+type hookModel struct {
+	ID  string
+	Foo string
 
-	beforeSaveFunc func(ctx context.Context, store Storer, entity interface{}) error
+	beforeSaveFunc   func(ctx context.Context, store Storer, entity interface{}) error
+	beforeDeleteFunc func(ctx context.Context, store Storer, entity interface{}) error
 }
 
-func (b *beforeSaveModel) FromEntity(e interface{}) error {
-	b.ID = e.(*beforeSaveEntity).ID
+func (h *hookModel) FromEntity(e interface{}) error {
+	h.ID = e.(*hookEntity).ID
 
-	b.beforeSaveFunc = e.(*beforeSaveEntity).beforeSaveFunc
+	h.beforeSaveFunc = e.(*hookEntity).beforeSaveFunc
+	h.beforeDeleteFunc = e.(*hookEntity).beforeDeleteFunc
 
 	return nil
 }
 
-func (b *beforeSaveModel) ToEntity() (interface{}, error) {
-	return &beforeSaveEntity{
-		ID: b.ID,
+func (h *hookModel) ToEntity() (interface{}, error) {
+	return &hookEntity{
+		ID: h.ID,
 	}, nil
 }
 
-func (b *beforeSaveModel) BeforeSave(ctx context.Context, store Storer, entity interface{}) error {
-	return b.beforeSaveFunc(ctx, store, entity)
+func (h *hookModel) BeforeSave(ctx context.Context, store Storer, entity interface{}) error {
+	if h.beforeSaveFunc == nil {
+		return nil
+	}
+
+	return h.beforeSaveFunc(ctx, store, entity)
 }
 
-func TestStore_BeforeSave(t *testing.T) {
+func (h *hookModel) BeforeDelete(ctx context.Context, store Storer, entity interface{}) error {
+	if h.beforeDeleteFunc == nil {
+		return nil
+	}
+
+	return h.beforeDeleteFunc(ctx, store, entity)
+}
+
+func TestStore_Hooks(t *testing.T) {
 	assert := assert.New(t)
 
 	// See docker-compose.yml
@@ -761,8 +777,8 @@ func TestStore_BeforeSave(t *testing.T) {
 	assert.NoError(err)
 
 	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&beforeSaveEntity{}): ModelConfig{
-			Model:          reflect.TypeOf(&beforeSaveModel{}),
+		reflect.TypeOf(&hookEntity{}): ModelConfig{
+			Model:          reflect.TypeOf(&hookModel{}),
 			FieldColumnMap: FieldColumnMap{},
 		},
 	})
@@ -770,7 +786,7 @@ func TestStore_BeforeSave(t *testing.T) {
 	// BeforeSave success
 	called := false
 
-	beforeSave := &beforeSaveEntity{
+	beforeSave := &hookEntity{
 		ID: "foo",
 		beforeSaveFunc: func(ctx context.Context, store Storer, entity interface{}) error {
 			called = true
@@ -786,7 +802,7 @@ func TestStore_BeforeSave(t *testing.T) {
 	// BeforeSave error
 	called = false
 
-	beforeSave = &beforeSaveEntity{
+	beforeSave = &hookEntity{
 		ID: "foo",
 		beforeSaveFunc: func(ctx context.Context, store Storer, entity interface{}) error {
 			called = true
@@ -799,6 +815,43 @@ func TestStore_BeforeSave(t *testing.T) {
 
 	assert.True(called)
 
+	// BeforeDelete success
+	called = false
+
+	beforeDelete := &hookEntity{
+		ID: "foo",
+		beforeDeleteFunc: func(ctx context.Context, store Storer, entity interface{}) error {
+			called = true
+			return nil
+		},
+	}
+
+	err = store.Save(context.Background(), beforeDelete)
+	assert.NoError(err)
+
+	err = store.Delete(context.Background(), beforeDelete)
+	assert.NoError(err)
+
+	assert.True(called)
+
+	// BeforeDelete error
+	called = false
+
+	beforeDelete = &hookEntity{
+		ID: "foo",
+		beforeDeleteFunc: func(ctx context.Context, store Storer, entity interface{}) error {
+			called = true
+			return errors.New("test")
+		},
+	}
+
+	err = store.Save(context.Background(), beforeDelete)
+	assert.NoError(err)
+
+	err = store.Delete(context.Background(), beforeDelete)
+	assert.Error(err)
+
+	assert.True(called)
 }
 
 func createSchema(db *pg.DB) error {
@@ -807,7 +860,7 @@ func createSchema(db *pg.DB) error {
 		(*profileModel)(nil),
 		(*locationModel)(nil),
 		(*addressModel)(nil),
-		(*beforeSaveModel)(nil),
+		(*hookModel)(nil),
 	}
 
 	for _, model := range models {
