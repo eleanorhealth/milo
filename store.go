@@ -420,7 +420,7 @@ func (s *Store) Save(ctx context.Context, entity interface{}) error {
 
 	exists, err := tx.Model(model).WherePK().Exists()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "exists")
 	}
 
 	// Insert
@@ -428,12 +428,12 @@ func (s *Store) Save(ctx context.Context, entity interface{}) error {
 	if !exists {
 		_, err := tx.Model(model).Insert()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "inserting model")
 		}
 
 		err = insertRelated(tx, model)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "inserting related models (insert)")
 		}
 
 		if !s.inTransaction() {
@@ -450,17 +450,17 @@ func (s *Store) Save(ctx context.Context, entity interface{}) error {
 
 	_, err = tx.Model(model).WherePK().Update()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "updating model")
 	}
 
 	err = deleteRelated(tx, model)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "deleting related models")
 	}
 
 	err = insertRelated(tx, model)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "inserting related models (update)")
 	}
 
 	if !s.inTransaction() {
@@ -500,6 +500,13 @@ func (s *Store) Delete(ctx context.Context, entity interface{}) error {
 		}
 
 		defer tx.Rollback()
+	}
+
+	if model, ok := model.(Hook); ok {
+		err = model.BeforeDelete(ctx, NewStore(tx, s.entityModelMap), entity)
+		if err != nil {
+			return errors.Wrap(err, "calling BeforeDelete")
+		}
 	}
 
 	_, err = tx.Model(model).WherePK().Delete()
