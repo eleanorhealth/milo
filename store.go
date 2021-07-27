@@ -35,8 +35,8 @@ type Storer interface {
 	FindByID(entity interface{}, id interface{}) error
 	FindByIDForUpdate(entity interface{}, id interface{}, skipLocked bool) error
 
-	Save(entity interface{}) error
-	Delete(entity interface{}) error
+	Save(ctx context.Context, entity interface{}) error
+	Delete(ctx context.Context, entity interface{}) error
 }
 
 type Store struct {
@@ -382,7 +382,7 @@ func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}, skipLocked
 	return s.FindOneByForUpdate(entity, skipLocked, Equal(Column(pk.SQLName), id))
 }
 
-func (s *Store) Save(entity interface{}) error {
+func (s *Store) Save(ctx context.Context, entity interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelConfig, ok := s.entityModelMap[entityType]
@@ -412,7 +412,7 @@ func (s *Store) Save(entity interface{}) error {
 	}
 
 	if model, ok := model.(Hook); ok {
-		err = model.BeforeSave(NewStore(tx, s.entityModelMap), entity)
+		err = model.BeforeSave(ctx, NewStore(tx, s.entityModelMap), entity)
 		if err != nil {
 			return errors.Wrap(err, "calling BeforeSave")
 		}
@@ -473,7 +473,7 @@ func (s *Store) Save(entity interface{}) error {
 	return nil
 }
 
-func (s *Store) Delete(entity interface{}) error {
+func (s *Store) Delete(ctx context.Context, entity interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelConfig, ok := s.entityModelMap[entityType]

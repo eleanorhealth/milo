@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -46,7 +47,7 @@ func main() {
 		},
 	}
 
-	err = store.Save(customer)
+	err = store.Save(context.Background(), customer)
 	if err != nil {
 		log.Fatal(err)
 	}
