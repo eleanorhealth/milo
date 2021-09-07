@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	store := milo.NewStore(db, storage.MiloEntityModelMap)
+	store, err := milo.NewStore(db, storage.MiloEntityModelMap)
 
 	customer := &domain.Customer{
 		ID: entityid.DefaultGenerator.Generate(),
