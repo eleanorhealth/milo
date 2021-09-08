@@ -4,15 +4,15 @@ A utility package for https://github.com/go-pg/pg that makes persisting DDD aggr
 
 ## Quick Start
 
-The best place to start exploring Milo is by taking a look at the [examples](/examples). It may help to have a high level understanding of [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) before looking at the code.
+The best place to start exploring Milo is by taking a look at the [examples](/examples). Both the [simple](/examples/simple) and [store](/examples/store) examples borrow concepts from [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) and [Domain-Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design), but the [store](/examples/store) example shows how to call Milo from your own stores.
 
 Run the example:
 ```bash
 $ docker-compose up postgres
-$ go run examples/ddd/cmd/example/main.go
+$ go run examples/simple/cmd/example/main.go
 ```
 
-In the [examples/ddd/cmd/example/main.go](/examples/ddd/cmd/example/main.go), we see that Milo allows us to persist a `Customer` entity (including the nested addresses) to the database:
+In the [examples/simple/cmd/example/main.go](/examples/simple/cmd/example/main.go), we see that Milo allows us to persist a `Customer` entity to the database:
 
 ```go
 store, err := milo.NewStore(db, storage.MiloEntityModelMap)
@@ -21,26 +21,14 @@ if err != nil {
 }
 
 customer := &domain.Customer{
-    ID: entityid.DefaultGenerator.Generate(),
-
-    NameFirst: "John",
-    NameLast:  "Smith",
-
-    Addresses: []*domain.Address{
-        {
-            ID: entityid.DefaultGenerator.Generate(),
-
-            Street: "1 City Hall Square #500",
-            City:   "Boston",
-            State:  "MA",
-            Zip:    "02201",
-        },
-    },
+	ID:        entityid.DefaultGenerator.Generate(),
+	NameFirst: "Jane",
+	NameLast:  "Doe",
 }
 
-err = store.Save(customer)
+err = store.Save(context.Background(), customer)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 ```
 
@@ -50,7 +38,7 @@ To make this work, Milo needs to be configured to understand how to map entities
 store, err := milo.NewStore(db, storage.MiloEntityModelMap)
 ```
 
-Code from [examples/ddd/storage/milo.go](/examples/ddd/storage/milo.go):
+Code from [examples/simple/storage/milo.go](/examples/simple/storage/milo.go):
 
 ```go
 var MiloEntityModelMap = milo.EntityModelMap{
@@ -58,7 +46,7 @@ var MiloEntityModelMap = milo.EntityModelMap{
 }
 ```
 
-The last step is to implement `FromEntity` and `ToEntity` on the storage model. These two methods are what Milo calls to transform entities and models to and from eachother. Code from [examples/ddd/storage/customer.go](/examples/ddd/storage/customer.go):
+The last step is to implement `FromEntity` and `ToEntity` on the storage model. These two methods are what Milo calls to transform entities and models to and from eachother. Code from [examples/simple/storage/customer.go](/examples/simple/storage/customer.go):
 
 ```go
 func (c *customer) FromEntity(e interface{}) error {
@@ -67,19 +55,7 @@ func (c *customer) FromEntity(e interface{}) error {
 	c.ID = entity.ID.String()
 
 	c.NameFirst = entity.NameFirst
-	c.NameFirst = entity.NameLast
-
-	for _, a := range entity.Addresses {
-		c.Addresses = append(c.Addresses, &address{
-			ID:         a.ID.String(),
-			CustomerID: c.ID,
-
-			Street: a.Street,
-			City:   a.City,
-			State:  a.State,
-			Zip:    a.Zip,
-		})
-	}
+	c.NameLast = entity.NameLast
 
 	return nil
 }
@@ -92,17 +68,6 @@ func (c *customer) ToEntity() (interface{}, error) {
 	entity.NameFirst = c.NameFirst
 	entity.NameLast = c.NameLast
 
-	for _, a := range c.Addresses {
-		entity.Addresses = append(entity.Addresses, &domain.Address{
-			ID: entityid.ID(a.ID),
-
-			Street: a.Street,
-			City:   a.City,
-			State:  a.State,
-			Zip:    a.Zip,
-		})
-	}
-
 	return entity, nil
 }
 ```
@@ -114,25 +79,25 @@ FindBy and FindOneBy (and variants) take in an additional argument of one or mor
 ```go
 // Find all customers with a first name of John.
 customers := []*domain.Customer{}
-store.FindBy(&customers, milo.Equal("name_first", "John"))
+store.FindBy(context.Background(), &customers, milo.Equal("name_first", "John"))
 
 // Find the first customer that does not have the first name of John.
 customer := &domain.Customer{}
-store.FindOneBy(customer, milo.NotEqual("name_first", "John"))
+store.FindOneBy(context.Background(), customer, milo.NotEqual("name_first", "John"))
 ```
 
-Above, the first arguments to `Equal` and `NotEqual` is the column name.
+Above, the first arguments to `Equal` and `NotEqual` are the column names you wish to apply the expression to.
 
 You may also use the `And` and `Or` functions to create slightly more advanced expressions:
 
 ```go
 // Find the first customer named John Smith.
 customer := &domain.Customer{}
-store.FindOneBy(customer, milo.And(milo.Equal("name_first", "John"), milo.Equal("name_last", "Smith"))
+store.FindOneBy(context.Background(), customer, milo.And(milo.Equal("name_first", "John"), milo.Equal("name_last", "Smith"))
 
 // Find all customers with the first name of John or Sally.
 customers := []*domain.Customer{}
-store.FindBy(&customers, milo.Or(milo.Equal("name_first", "John"), milo.Equal("name_first", "Sally"))
+store.FindBy(context.Background(), &customers, milo.Or(milo.Equal("name_first", "John"), milo.Equal("name_first", "Sally"))
 ```
 
 See [expression.go](/expression.go) for a full list of expression functions.
@@ -146,25 +111,25 @@ err := store.Transaction(context.Background(), func(txStore *milo.Store) error {
 	var error err
 
 	customer := &domain.Customer{}
-	err = store.FindOneBy(customer, milo.Equal("name_first", "John"))
+	err = txStore.FindOneBy(context.Background(), customer, milo.Equal("name_first", "John"))
 	if err != nil {
 		return err
 	}
 	customer.NameLast = "Doe"
 
 	customer2 := &domain.Customer{}
-	err = store.FindOneBy(customer2, milo.Equal("name_first", "Sally"))
+	err = txStore.FindOneBy(context.Background(), customer2, milo.Equal("name_first", "Sally"))
 	if err != nil {
 		return err
 	}
 	customer2.NameLast = "Doe"
 
-	err = store.Save(customer)
+	err = txStore.Save(context.Background(), customer)
 	if err != nil {
 		return err
 	}
 
-	err = store.Save(customer2)
+	err = txStore.Save(context.Background(), customer2)
 	if err != nil {
 		return err
 	}
