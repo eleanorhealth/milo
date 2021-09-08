@@ -534,12 +534,12 @@ func (s *Store) Save(ctx context.Context, entity interface{}) error {
 	// Insert
 
 	if !exists {
-		_, err := tx.Model(model).Insert()
+		_, err := tx.Model(model).Context(ctx).Insert()
 		if err != nil {
 			return errors.Wrap(err, "inserting model")
 		}
 
-		err = insertRelated(tx, model)
+		err = insertRelated(ctx, tx, model)
 		if err != nil {
 			return errors.Wrap(err, "inserting related models (insert)")
 		}
@@ -556,17 +556,17 @@ func (s *Store) Save(ctx context.Context, entity interface{}) error {
 
 	// Update
 
-	_, err = tx.Model(model).WherePK().Update()
+	_, err = tx.Model(model).Context(ctx).WherePK().Update()
 	if err != nil {
 		return errors.Wrap(err, "updating model")
 	}
 
-	err = deleteRelated(tx, model)
+	err = deleteRelated(ctx, tx, model)
 	if err != nil {
 		return errors.Wrap(err, "deleting related models (update)")
 	}
 
-	err = insertRelated(tx, model)
+	err = insertRelated(ctx, tx, model)
 	if err != nil {
 		return errors.Wrap(err, "inserting related models (update)")
 	}
@@ -622,12 +622,12 @@ func (s *Store) Delete(ctx context.Context, entity interface{}) error {
 		}
 	}
 
-	_, err = tx.Model(model).WherePK().Delete()
+	_, err = tx.Model(model).Context(ctx).WherePK().Delete()
 	if err != nil {
 		return err
 	}
 
-	err = deleteRelated(tx, model)
+	err = deleteRelated(ctx, tx, model)
 	if err != nil {
 		return errors.Wrap(err, "deleting related models (delete)")
 	}
@@ -642,7 +642,7 @@ func (s *Store) Delete(ctx context.Context, entity interface{}) error {
 	return nil
 }
 
-func insertRelated(db orm.DB, model Model) error {
+func insertRelated(ctx context.Context, db orm.DB, model Model) error {
 	modelValue := reflect.ValueOf(model)
 
 	relations := db.Model(model).TableModel().Table().Relations
@@ -665,7 +665,7 @@ func insertRelated(db orm.DB, model Model) error {
 			relatedModelField = relatedModelField.Addr()
 		}
 
-		_, err := db.Model(relatedModelField.Interface()).Insert()
+		_, err := db.Model(relatedModelField.Interface()).Context(ctx).Insert()
 		if err != nil {
 			return err
 		}
@@ -675,7 +675,7 @@ func insertRelated(db orm.DB, model Model) error {
 	return nil
 }
 
-func deleteRelated(db orm.DB, model Model) error {
+func deleteRelated(ctx context.Context, db orm.DB, model Model) error {
 	modelValue := reflect.ValueOf(model)
 
 	relations := db.Model(model).TableModel().Table().Relations
@@ -686,7 +686,7 @@ func deleteRelated(db orm.DB, model Model) error {
 			relatedModelFieldValue = relatedModelFieldValue.Addr()
 		}
 
-		deleteQuery := db.Model(relatedModelFieldValue.Interface())
+		deleteQuery := db.Model(relatedModelFieldValue.Interface()).Context(ctx)
 
 		for i, fk := range relation.JoinFKs {
 			baseFK := relation.BaseFKs[i]
