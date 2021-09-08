@@ -4,15 +4,15 @@ A utility package for https://github.com/go-pg/pg that makes persisting DDD aggr
 
 ## Quick Start
 
-The best place to start exploring Milo is by taking a look at the [example](/example). It may help to have a high level understanding of [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) before looking at the example code.
+The best place to start exploring Milo is by taking a look at the [examples](/examples). It may help to have a high level understanding of [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) before looking at the code.
 
 Run the example:
 ```bash
 $ docker-compose up postgres
-$ go run example/cmd/main.go
+$ go run examples/ddd/cmd/example/main.go
 ```
 
-In the [example/cmd/example/main.go](/example/cmd/example/main.go), we see that Milo allows us to persist a `Customer` entity (including the nested addresses) to the database:
+In the [examples/ddd/cmd/example/main.go](/examples/ddd/cmd/example/main.go), we see that Milo allows us to persist a `Customer` entity (including the nested addresses) to the database:
 
 ```go
 store, err := milo.NewStore(db, storage.MiloEntityModelMap)
@@ -50,7 +50,7 @@ To make this work, Milo needs to be configured to understand how to map entities
 store, err := milo.NewStore(db, storage.MiloEntityModelMap)
 ```
 
-Code from [example/storage/milo.go](/example/storage/milo.go):
+Code from [examples/ddd/storage/milo.go](/examples/ddd/storage/milo.go):
 
 ```go
 var MiloEntityModelMap = milo.EntityModelMap{
@@ -58,7 +58,7 @@ var MiloEntityModelMap = milo.EntityModelMap{
 }
 ```
 
-The last step is to implement `FromEntity` and `ToEntity` on the storage model. These two methods are what Milo calls to transform entities and models to and from eachother. Code from [example/storage/customer.go](/example/storage/customer.go):
+The last step is to implement `FromEntity` and `ToEntity` on the storage model. These two methods are what Milo calls to transform entities and models to and from eachother. Code from [examples/ddd/storage/customer.go](/examples/ddd/storage/customer.go):
 
 ```go
 func (c *customer) FromEntity(e interface{}) error {

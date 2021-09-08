@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/eleanorhealth/milo"
-	"github.com/eleanorhealth/milo/example/domain"
+	"github.com/eleanorhealth/milo/examples/store/domain"
 )
 
 type Store struct {

@@ -6,9 +6,9 @@ import (
 	"log"
 
 	"github.com/eleanorhealth/milo"
-	"github.com/eleanorhealth/milo/example/domain"
-	"github.com/eleanorhealth/milo/example/entityid"
-	"github.com/eleanorhealth/milo/example/storage"
+	"github.com/eleanorhealth/milo/examples/store/domain"
+	"github.com/eleanorhealth/milo/examples/store/entityid"
+	"github.com/eleanorhealth/milo/examples/store/storage"
 	"github.com/go-pg/pg/v10"
 )
 

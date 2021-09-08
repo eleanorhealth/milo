@@ -4,7 +4,7 @@ import (
 	"reflect"
 
 	"github.com/eleanorhealth/milo"
-	"github.com/eleanorhealth/milo/example/domain"
+	"github.com/eleanorhealth/milo/examples/store/domain"
 )
 
 // MiloEntityModelMap is used by Milo to map domain entities to storage models.

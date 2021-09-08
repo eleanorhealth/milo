@@ -3,7 +3,7 @@ package domain
 import (
 	"context"
 
-	"github.com/eleanorhealth/milo/example/entityid"
+	"github.com/eleanorhealth/milo/examples/store/entityid"
 )
 
 type Storer interface {

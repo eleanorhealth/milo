@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/eleanorhealth/milo"
-	"github.com/eleanorhealth/milo/example/domain"
-	"github.com/eleanorhealth/milo/example/entityid"
+	"github.com/eleanorhealth/milo/examples/store/domain"
+	"github.com/eleanorhealth/milo/examples/store/entityid"
 	"github.com/pkg/errors"
 )
 
@@ -89,7 +89,7 @@ func NewCustomerStore(miloStore milo.Storer) *CustomerStore {
 
 func (s *CustomerStore) FindAll() ([]*domain.Customer, error) {
 	entities := []*domain.Customer{}
-	err := s.miloStore.FindAll(&entities)
+	err := s.miloStore.FindAll(context.Background(), &entities)
 	if err != nil {
 		return nil, errors.Wrap(err, "finding all entities")
 	}
@@ -99,7 +99,7 @@ func (s *CustomerStore) FindAll() ([]*domain.Customer, error) {
 
 func (s *CustomerStore) FindByID(id entityid.ID) (*domain.Customer, error) {
 	entity := &domain.Customer{}
-	err := s.miloStore.FindByID(entity, id)
+	err := s.miloStore.FindByID(context.Background(), entity, id)
 	if err != nil {
 		return nil, errors.Wrap(err, "finding entity by ID")
 	}
@@ -109,7 +109,7 @@ func (s *CustomerStore) FindByID(id entityid.ID) (*domain.Customer, error) {
 
 func (s *CustomerStore) FindByIDForUpdate(id entityid.ID, skipLocked bool) (*domain.Customer, error) {
 	entity := &domain.Customer{}
-	err := s.miloStore.FindByIDForUpdate(entity, id, skipLocked)
+	err := s.miloStore.FindByIDForUpdate(context.Background(), entity, id, skipLocked)
 	if err != nil {
 		return nil, errors.Wrap(err, "finding entity by ID for update")
 	}

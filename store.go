@@ -15,16 +15,16 @@ type EntityModelMap map[reflect.Type]reflect.Type
 type Storer interface {
 	Transaction(ctx context.Context, fn func(txStore Storer) error) error
 
-	FindAll(entities interface{}) error
+	FindAll(ctx context.Context, entities interface{}) error
 
-	FindBy(entities interface{}, exprs ...Expression) error
-	FindByForUpdate(entities interface{}, skipLocked bool, exprs ...Expression) error
+	FindBy(ctx context.Context, entities interface{}, exprs ...Expression) error
+	FindByForUpdate(ctx context.Context, entities interface{}, skipLocked bool, exprs ...Expression) error
 
-	FindOneBy(entity interface{}, exprs ...Expression) error
-	FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ...Expression) error
+	FindOneBy(ctx context.Context, entity interface{}, exprs ...Expression) error
+	FindOneByForUpdate(ctx context.Context, entity interface{}, skipLocked bool, exprs ...Expression) error
 
-	FindByID(entity interface{}, id interface{}) error
-	FindByIDForUpdate(entity interface{}, id interface{}, skipLocked bool) error
+	FindByID(ctx context.Context, entity interface{}, id interface{}) error
+	FindByIDForUpdate(ctx context.Context, entity interface{}, id interface{}, skipLocked bool) error
 
 	Save(ctx context.Context, entity interface{}) error
 	Delete(ctx context.Context, entity interface{}) error
@@ -119,7 +119,7 @@ func (s *Store) Transaction(ctx context.Context, fn func(txStore Storer) error) 
 	})
 }
 
-func (s *Store) FindAll(entities interface{}) error {
+func (s *Store) FindAll(ctx context.Context, entities interface{}) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -145,6 +145,7 @@ func (s *Store) FindAll(entities interface{}) error {
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
+	query.Context(ctx)
 
 	relations := s.db.Model(models).TableModel().Table().Relations
 	for _, relation := range relations {
@@ -173,7 +174,7 @@ func (s *Store) FindAll(entities interface{}) error {
 	return nil
 }
 
-func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
+func (s *Store) FindBy(ctx context.Context, entities interface{}, exprs ...Expression) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -199,6 +200,7 @@ func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
+	query.Context(ctx)
 	err := applyExpressionsToQuery(exprs, query)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
@@ -231,7 +233,7 @@ func (s *Store) FindBy(entities interface{}, exprs ...Expression) error {
 	return nil
 }
 
-func (s *Store) FindByForUpdate(entities interface{}, skipLocked bool, exprs ...Expression) error {
+func (s *Store) FindByForUpdate(ctx context.Context, entities interface{}, skipLocked bool, exprs ...Expression) error {
 	entitiesType := reflect.TypeOf(entities)
 
 	if entitiesType.Kind() != reflect.Ptr {
@@ -257,6 +259,7 @@ func (s *Store) FindByForUpdate(entities interface{}, skipLocked bool, exprs ...
 	models := modelsValue.Interface()
 
 	query := s.db.Model(models)
+	query.Context(ctx)
 	err := applyExpressionsToQuery(exprs, query)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
@@ -296,7 +299,7 @@ func (s *Store) FindByForUpdate(entities interface{}, skipLocked bool, exprs ...
 	return nil
 }
 
-func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
+func (s *Store) FindOneBy(ctx context.Context, entity interface{}, exprs ...Expression) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelType, ok := s.entityModelMap[entityType]
@@ -308,6 +311,7 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	query.Context(ctx)
 	err := applyExpressionsToQuery(exprs, query)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
@@ -338,7 +342,7 @@ func (s *Store) FindOneBy(entity interface{}, exprs ...Expression) error {
 	return nil
 }
 
-func (s *Store) FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ...Expression) error {
+func (s *Store) FindOneByForUpdate(ctx context.Context, entity interface{}, skipLocked bool, exprs ...Expression) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelType, ok := s.entityModelMap[entityType]
@@ -350,6 +354,7 @@ func (s *Store) FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ..
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	query.Context(ctx)
 	err := applyExpressionsToQuery(exprs, query)
 	if err != nil {
 		return errors.Wrap(err, "applying expressions to query")
@@ -387,7 +392,7 @@ func (s *Store) FindOneByForUpdate(entity interface{}, skipLocked bool, exprs ..
 	return nil
 }
 
-func (s *Store) FindByID(entity interface{}, id interface{}) error {
+func (s *Store) FindByID(ctx context.Context, entity interface{}, id interface{}) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelType, ok := s.entityModelMap[entityType]
@@ -399,6 +404,7 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	query.Context(ctx)
 
 	for _, pk := range query.TableModel().Table().PKs {
 		query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, pk.SQLName), id)
@@ -429,7 +435,7 @@ func (s *Store) FindByID(entity interface{}, id interface{}) error {
 	return nil
 }
 
-func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}, skipLocked bool) error {
+func (s *Store) FindByIDForUpdate(ctx context.Context, entity interface{}, id interface{}, skipLocked bool) error {
 	entityType := reflect.TypeOf(entity)
 
 	modelType, ok := s.entityModelMap[entityType]
@@ -441,6 +447,7 @@ func (s *Store) FindByIDForUpdate(entity interface{}, id interface{}, skipLocked
 	model := modelValue.Interface().(Model)
 
 	query := s.db.Model(model)
+	query.Context(ctx)
 
 	for _, pk := range query.TableModel().Table().PKs {
 		query.Where(fmt.Sprintf("%s.%s = ?", query.TableModel().Table().Alias, pk.SQLName), id)
