@@ -192,15 +192,10 @@ func TestStore_Pointer(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&userEntityPtr{}): ModelConfig{
-			Model: reflect.TypeOf(&userModelPtr{}),
-			FieldColumnMap: FieldColumnMap{
-				"NameFirst": "name_first",
-				"NameLast":  "name_last",
-			},
-		},
+	store, err := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&userEntityPtr{}): reflect.TypeOf(&userModelPtr{}),
 	})
+	assert.NoError(err)
 
 	user := &userEntityPtr{
 		ID:        uuid.New().String(),
@@ -249,11 +244,10 @@ func TestStore_Pointer(t *testing.T) {
 	assert.NoError(err)
 
 	foundUsers := []*userEntityPtr{}
-	err = store.FindAll(&foundUsers)
+	err = store.FindAll(context.Background(), &foundUsers)
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
-
 }
 
 type userEntity struct {
@@ -374,12 +368,10 @@ func TestStore_NonPointer(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&userEntity{}): ModelConfig{
-			Model:          reflect.TypeOf(&userModel{}),
-			FieldColumnMap: FieldColumnMap{},
-		},
+	store, err := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&userEntity{}): reflect.TypeOf(&userModel{}),
 	})
+	assert.NoError(err)
 
 	user := &userEntity{
 		ID:        uuid.New().String(),
@@ -424,7 +416,7 @@ func TestStore_NonPointer(t *testing.T) {
 	assert.NoError(err)
 
 	foundUser := &userEntity{}
-	err = store.FindByID(foundUser, user.ID)
+	err = store.FindByID(context.Background(), foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 }
@@ -447,15 +439,10 @@ func TestStore_Expressions(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&userEntityPtr{}): ModelConfig{
-			Model: reflect.TypeOf(&userModelPtr{}),
-			FieldColumnMap: FieldColumnMap{
-				"NameFirst": "name_first",
-				"NameLast":  "name_last",
-			},
-		},
+	store, err := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&userEntityPtr{}): reflect.TypeOf(&userModelPtr{}),
 	})
+	assert.NoError(err)
 
 	user := &userEntityPtr{
 		ID:        uuid.New().String(),
@@ -536,125 +523,125 @@ func TestStore_Expressions(t *testing.T) {
 
 	// FindAll.
 	foundUsers := []*userEntityPtr{}
-	err = store.FindAll(&foundUsers)
+	err = store.FindAll(context.Background(), &foundUsers)
 	assert.NoError(err)
 	assert.Len(foundUsers, 3)
 	assert.Contains(foundUsers, user)
 	assert.Contains(foundUsers, user2)
 	assert.Contains(foundUsers, user3)
 
-	// FindBy (one field).
+	// FindBy (one column).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst))
+	err = store.FindBy(context.Background(), &foundUsers, Equal("name_first", user.NameFirst))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
-	// FindByForUpdate (don't skip locked, one field).
+	// FindByForUpdate (don't skip locked, one column).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindByForUpdate(&foundUsers, false, Equal("NameFirst", user.NameFirst))
+	err = store.FindByForUpdate(context.Background(), &foundUsers, false, Equal("name_first", user.NameFirst))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
-	// FindByForUpdate (skip locked, one field).
+	// FindByForUpdate (skip locked, one column).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindByForUpdate(&foundUsers, true, Equal("NameFirst", user.NameFirst))
+	err = store.FindByForUpdate(context.Background(), &foundUsers, true, Equal("name_first", user.NameFirst))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
-	// FindBy (multiple fields).
+	// FindBy (multiple columns).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast))
+	err = store.FindBy(context.Background(), &foundUsers, Equal("name_first", user.NameFirst), Equal("name_last", user.NameLast))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
-	// FindBy (multiple fields, And).
+	// FindBy (multiple columns, And).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)))
+	err = store.FindBy(context.Background(), &foundUsers, And(Equal("name_first", user.NameFirst), Equal("name_last", user.NameLast)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 1)
 	assert.Contains(foundUsers, user)
 
-	// FindBy (multiple fields, Or).
+	// FindBy (multiple columns, Or).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Or(Equal("NameFirst", user.NameFirst), Equal("NameFirst", user2.NameFirst)))
+	err = store.FindBy(context.Background(), &foundUsers, Or(Equal("name_first", user.NameFirst), Equal("name_first", user2.NameFirst)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 2)
 	assert.Contains(foundUsers, user)
 	assert.Contains(foundUsers, user2)
 
-	// FindBy (multiple fields, nested).
+	// FindBy (multiple columns, nested).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Or(And(Equal("NameFirst", user.NameFirst), Equal("NameLast", user.NameLast)), Equal("NameFirst", user3.NameFirst)))
+	err = store.FindBy(context.Background(), &foundUsers, Or(And(Equal("name_first", user.NameFirst), Equal("name_last", user.NameLast)), Equal("name_first", user3.NameFirst)))
 	assert.NoError(err)
 	assert.Len(foundUsers, 2)
 	assert.Contains(foundUsers, user)
 	assert.Contains(foundUsers, user3)
 
-	// FindBy (one field, no match).
+	// FindBy (one column, no match).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, Equal("NameFirst", "foo"))
+	err = store.FindBy(context.Background(), &foundUsers, Equal("name_first", "foo"))
 	assert.NoError(err)
 	assert.Len(foundUsers, 0)
 
-	// FindOneBy (one field).
+	// FindOneBy (one column).
 	foundUser := &userEntityPtr{}
-	err = store.FindOneBy(foundUser, Equal("NameFirst", user.NameFirst))
+	err = store.FindOneBy(context.Background(), foundUser, Equal("name_first", user.NameFirst))
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
-	// FindOneBy (one field, no match).
+	// FindOneBy (one column, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, Equal("NameFirst", "foo"))
+	err = store.FindOneBy(context.Background(), foundUser, Equal("name_first", "foo"))
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
 
-	// FindOneByForUpdate (one field, don't skip locked, no match).
+	// FindOneByForUpdate (one column, don't skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindOneByForUpdate(foundUser, false, Equal("NameFirst", "foo"))
+	err = store.FindOneByForUpdate(context.Background(), foundUser, false, Equal("name_first", "foo"))
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
 
-	// FindOneByForUpdate (one field, skip locked, no match).
+	// FindOneByForUpdate (one column, skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindOneByForUpdate(foundUser, true, Equal("NameFirst", "foo"))
+	err = store.FindOneByForUpdate(context.Background(), foundUser, true, Equal("name_first", "foo"))
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 	assert.NotEqual(user, foundUser)
 
 	// FindByID.
 	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
+	err = store.FindByID(context.Background(), foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal(user, foundUser)
 
 	// FindByID (no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, "foo")
+	err = store.FindByID(context.Background(), foundUser, "foo")
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
 	// FindByIDForUpdate (don't skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindByIDForUpdate(foundUser, "foo", false)
+	err = store.FindByIDForUpdate(context.Background(), foundUser, "foo", false)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
 	// FindByIDForUpdate (skip locked, no match).
 	foundUser = &userEntityPtr{}
-	err = store.FindByIDForUpdate(foundUser, "foo", true)
+	err = store.FindByIDForUpdate(context.Background(), foundUser, "foo", true)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
 	// Transaction (FindByIDForUpdate, skip locked, and Save).
-	err = store.Transaction(func(txStore Storer) error {
+	err = store.Transaction(context.Background(), func(txStore Storer) error {
 		foundUser = &userEntityPtr{}
-		err = txStore.FindByIDForUpdate(foundUser, user.ID, true)
+		err = txStore.FindByIDForUpdate(context.Background(), foundUser, user.ID, true)
 		assert.NoError(err)
 		assert.Equal(user, foundUser)
 
@@ -671,7 +658,7 @@ func TestStore_Expressions(t *testing.T) {
 
 	// Check if the transaction made the expected change.
 	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
+	err = store.FindByID(context.Background(), foundUser, user.ID)
 	assert.NoError(err)
 	assert.Equal("Marcia", foundUser.NameFirst)
 
@@ -681,12 +668,12 @@ func TestStore_Expressions(t *testing.T) {
 
 	// Check if the user was deleted.
 	foundUser = &userEntityPtr{}
-	err = store.FindByID(foundUser, user.ID)
+	err = store.FindByID(context.Background(), foundUser, user.ID)
 	assert.Error(err)
 	assert.ErrorIs(err, ErrNotFound)
 
 	// Transaction (error).
-	err = store.Transaction(func(txStore Storer) error {
+	err = store.Transaction(context.Background(), func(txStore Storer) error {
 		return errors.New("test")
 	})
 	assert.Error(err)
@@ -697,13 +684,13 @@ func TestStore_Expressions(t *testing.T) {
 
 	// FindOneBy (IsNull).
 	foundUser = &userEntityPtr{}
-	err = store.FindOneBy(foundUser, IsNull("NameLast"))
+	err = store.FindOneBy(context.Background(), foundUser, IsNull("name_last"))
 	assert.NoError(err)
 	assert.Equal(user3, foundUser)
 
 	// FindOneBy (IsNotNull).
 	foundUsers = []*userEntityPtr{}
-	err = store.FindBy(&foundUsers, IsNotNull("NameLast"))
+	err = store.FindBy(context.Background(), &foundUsers, IsNotNull("name_last"))
 	assert.NoError(err)
 	// There are 3 users:
 	// User 1 has been deleted.
@@ -776,12 +763,10 @@ func TestStore_Hooks(t *testing.T) {
 	err = createSchema(db)
 	assert.NoError(err)
 
-	store := NewStore(db, EntityModelMap{
-		reflect.TypeOf(&hookEntity{}): ModelConfig{
-			Model:          reflect.TypeOf(&hookModel{}),
-			FieldColumnMap: FieldColumnMap{},
-		},
+	store, err := NewStore(db, EntityModelMap{
+		reflect.TypeOf(&hookEntity{}): reflect.TypeOf(&hookModel{}),
 	})
+	assert.NoError(err)
 
 	// BeforeSave success
 	called := false

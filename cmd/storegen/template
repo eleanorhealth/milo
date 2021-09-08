@@ -1,0 +1,69 @@
+// {{ .EntityName }}Storer is the store interface. This should be copied into the domain layer.
+type {{ .EntityName }}Storer interface {
+	FindAll() ([]{{ .EntityType }}, error)
+
+	FindByID(id {{ .IDType }}) ({{ .EntityType }}, error)
+	FindByIDForUpdate(id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error)
+
+	Save(context.Context, {{ .EntityType }}) error
+	Delete(context.Context, {{ .EntityType }}) error
+}
+
+// {{ .EntityName }}Store is an implementation of {{ .EntityName }}Storer that uses Milo. This should be copied into the storage layer.
+type {{ .EntityName }}Store struct {
+    miloStore milo.Storer
+}
+
+func New{{ .EntityName }}Store(miloStore milo.Storer) *{{ .EntityName }}Store {
+    return &{{ .EntityName }}Store{
+        miloStore: miloStore,
+    }
+}
+
+func (s *{{ .EntityName }}Store) FindAll() ([]{{ .EntityType }}, error) {
+    entities := []{{ .EntityType }}{}
+    err := s.miloStore.FindAll(&entities)
+    if err != nil {
+        return nil, errors.Wrap(err, "finding all entities")
+    }
+
+    return entities, nil
+}
+
+func (s *{{ .EntityName }}Store) FindByID(id {{ .IDType }}) ({{ .EntityType }}, error) {
+    entity := &{{ trimLeft .EntityType "*" }}{}
+    err := s.miloStore.FindByID(entity, id)
+    if err != nil {
+        return nil, errors.Wrap(err, "finding entity by ID")
+    }
+
+    return entity, nil
+}
+
+func (s *{{ .EntityName }}Store) FindByIDForUpdate(id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error) {
+    entity := &{{ trimLeft .EntityType "*" }}{}
+    err := s.miloStore.FindByIDForUpdate(entity, id, skipLocked)
+    if err != nil {
+        return nil, errors.Wrap(err, "finding entity by ID for update")
+    }
+
+    return entity, nil
+}
+
+func (s *{{ .EntityName }}Store) Save(ctx context.Context, entity {{ .EntityType }}) error {
+    err := s.miloStore.Save(ctx, entity)
+    if err != nil {
+        return errors.Wrap(err, "saving entity")
+    }
+
+    return nil
+}
+
+func (s *{{ .EntityName }}Store) Delete(ctx context.Context, entity {{ .EntityType }}) error {
+    err := s.miloStore.Delete(ctx, entity)
+    if err != nil {
+        return errors.Wrap(err, "deleting entity")
+    }
+
+    return nil
+}

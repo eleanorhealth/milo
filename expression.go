@@ -21,15 +21,15 @@ const (
 )
 
 type Expression struct {
-	field interface{}
-	op    Op
-	value interface{}
-	t     expressionType
-	exprs []Expression
+	column interface{}
+	op     Op
+	value  interface{}
+	t      expressionType
+	exprs  []Expression
 }
 
-func (e Expression) Field() interface{} {
-	return e.field
+func (e Expression) Column() interface{} {
+	return e.column
 }
 
 func (e Expression) Op() interface{} {
@@ -58,74 +58,74 @@ func Or(exprs ...Expression) Expression {
 	return Expression{exprs: exprs}
 }
 
-func Equal(field interface{}, value interface{}) Expression {
+func Equal(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpEqual,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpEqual,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func NotEqual(field interface{}, value interface{}) Expression {
+func NotEqual(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpNotEqual,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpNotEqual,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func Gt(field interface{}, value interface{}) Expression {
+func Gt(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpGt,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpGt,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func Lt(field interface{}, value interface{}) Expression {
+func Lt(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpLt,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpLt,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func Gte(field interface{}, value interface{}) Expression {
+func Gte(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpGte,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpGte,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func Lte(field interface{}, value interface{}) Expression {
+func Lte(column interface{}, value interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpLte,
-		value: value,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpLte,
+		value:  value,
+		t:      expressionTypeAnd,
 	}
 }
 
-func IsNull(field interface{}) Expression {
+func IsNull(column interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpIsNull,
-		value: nil,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpIsNull,
+		value:  nil,
+		t:      expressionTypeAnd,
 	}
 }
 
-func IsNotNull(field interface{}) Expression {
+func IsNotNull(column interface{}) Expression {
 	return Expression{
-		field: field,
-		op:    OpIsNotNull,
-		value: nil,
-		t:     expressionTypeAnd,
+		column: column,
+		op:     OpIsNotNull,
+		value:  nil,
+		t:      expressionTypeAnd,
 	}
 }

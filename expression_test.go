@@ -11,16 +11,16 @@ func TestAnd(t *testing.T) {
 
 	exprs := []Expression{
 		{
-			field: "foo",
-			op:    OpEqual,
-			value: "bar",
-			t:     expressionTypeAnd,
+			column: "foo",
+			op:     OpEqual,
+			value:  "bar",
+			t:      expressionTypeAnd,
 		},
 		{
-			field: "bar",
-			op:    OpNotEqual,
-			value: "baz",
-			t:     expressionTypeAnd,
+			column: "bar",
+			op:     OpNotEqual,
+			value:  "baz",
+			t:      expressionTypeAnd,
 		},
 	}
 
@@ -34,16 +34,16 @@ func TestOr(t *testing.T) {
 
 	exprs := []Expression{
 		{
-			field: "foo",
-			op:    OpEqual,
-			value: "bar",
-			t:     expressionTypeOr,
+			column: "foo",
+			op:     OpEqual,
+			value:  "bar",
+			t:      expressionTypeOr,
 		},
 		{
-			field: "bar",
-			op:    OpNotEqual,
-			value: "baz",
-			t:     expressionTypeOr,
+			column: "bar",
+			op:     OpNotEqual,
+			value:  "baz",
+			t:      expressionTypeOr,
 		},
 	}
 
@@ -57,7 +57,7 @@ func TestEqual(t *testing.T) {
 
 	actual := Equal("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpEqual, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpEqual, value: "bar", t: expressionTypeAnd}, actual)
 }
 
 func TestNotEqual(t *testing.T) {
@@ -65,7 +65,7 @@ func TestNotEqual(t *testing.T) {
 
 	actual := NotEqual("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpNotEqual, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpNotEqual, value: "bar", t: expressionTypeAnd}, actual)
 }
 
 func TestGt(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGt(t *testing.T) {
 
 	actual := Gt("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpGt, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpGt, value: "bar", t: expressionTypeAnd}, actual)
 }
 
 func TestLt(t *testing.T) {
@@ -81,7 +81,7 @@ func TestLt(t *testing.T) {
 
 	actual := Lt("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpLt, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpLt, value: "bar", t: expressionTypeAnd}, actual)
 }
 
 func TestGte(t *testing.T) {
@@ -89,7 +89,7 @@ func TestGte(t *testing.T) {
 
 	actual := Gte("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpGte, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpGte, value: "bar", t: expressionTypeAnd}, actual)
 }
 
 func TestLte(t *testing.T) {
@@ -97,5 +97,5 @@ func TestLte(t *testing.T) {
 
 	actual := Lte("foo", "bar")
 
-	assert.Equal(Expression{field: "foo", op: OpLte, value: "bar", t: expressionTypeAnd}, actual)
+	assert.Equal(Expression{column: "foo", op: OpLte, value: "bar", t: expressionTypeAnd}, actual)
 }

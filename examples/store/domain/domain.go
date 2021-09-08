@@ -1,8 +1,6 @@
 package domain
 
-import (
-	"github.com/eleanorhealth/milo/example/entityid"
-)
+import "github.com/eleanorhealth/milo/examples/store/entityid"
 
 type Customer struct {
 	ID entityid.ID
