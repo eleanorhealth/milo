@@ -27,10 +27,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	store, err := milo.NewStore(db, storage.MiloEntityModelMap)
+	miloStore, err := milo.NewStore(db, storage.MiloEntityModelMap)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	store := storage.NewStore(miloStore)
 
 	customer := &domain.Customer{
 		ID: entityid.DefaultGenerator.Generate(),
@@ -50,10 +52,35 @@ func main() {
 		},
 	}
 
-	err = store.Save(context.Background(), customer)
+	err = store.Customers().Save(context.Background(), customer)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("Successfully saved customer %s %s\n", customer.NameFirst, customer.NameLast)
+
+	store.Transaction(context.Background(), func(txStore domain.Storer) error {
+		foundCustomer, err := txStore.Customers().FindByIDForUpdate(customer.ID, false)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Found customer %s %s for update\n", foundCustomer.NameFirst, foundCustomer.NameLast)
+
+		foundCustomer.NameLast = "Doe"
+
+		err = txStore.Customers().Save(context.Background(), foundCustomer)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		foundUpdatedCustomer, err := txStore.Customers().FindByIDForUpdate(foundCustomer.ID, false)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Found updated customer %s %s\n", foundUpdatedCustomer.NameFirst, foundUpdatedCustomer.NameLast)
+
+		return nil
+	})
 }

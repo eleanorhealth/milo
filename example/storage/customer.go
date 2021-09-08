@@ -1,9 +1,12 @@
 package storage
 
 import (
+	"context"
+
 	"github.com/eleanorhealth/milo"
 	"github.com/eleanorhealth/milo/example/domain"
 	"github.com/eleanorhealth/milo/example/entityid"
+	"github.com/pkg/errors"
 )
 
 type customer struct {
@@ -70,4 +73,64 @@ func (c *customer) ToEntity() (interface{}, error) {
 	}
 
 	return entity, nil
+}
+
+type CustomerStore struct {
+	miloStore milo.Storer
+}
+
+var _ domain.CustomerStorer = (*CustomerStore)(nil)
+
+func NewCustomerStore(miloStore milo.Storer) *CustomerStore {
+	return &CustomerStore{
+		miloStore: miloStore,
+	}
+}
+
+func (s *CustomerStore) FindAll() ([]*domain.Customer, error) {
+	entities := []*domain.Customer{}
+	err := s.miloStore.FindAll(&entities)
+	if err != nil {
+		return nil, errors.Wrap(err, "finding all entities")
+	}
+
+	return entities, nil
+}
+
+func (s *CustomerStore) FindByID(id entityid.ID) (*domain.Customer, error) {
+	entity := &domain.Customer{}
+	err := s.miloStore.FindByID(entity, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "finding entity by ID")
+	}
+
+	return entity, nil
+}
+
+func (s *CustomerStore) FindByIDForUpdate(id entityid.ID, skipLocked bool) (*domain.Customer, error) {
+	entity := &domain.Customer{}
+	err := s.miloStore.FindByIDForUpdate(entity, id, skipLocked)
+	if err != nil {
+		return nil, errors.Wrap(err, "finding entity by ID for update")
+	}
+
+	return entity, nil
+}
+
+func (s *CustomerStore) Save(ctx context.Context, entity *domain.Customer) error {
+	err := s.miloStore.Save(ctx, entity)
+	if err != nil {
+		return errors.Wrap(err, "saving entity")
+	}
+
+	return nil
+}
+
+func (s *CustomerStore) Delete(ctx context.Context, entity *domain.Customer) error {
+	err := s.miloStore.Delete(ctx, entity)
+	if err != nil {
+		return errors.Wrap(err, "deleting entity")
+	}
+
+	return nil
 }
