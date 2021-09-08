@@ -1,6 +1,6 @@
 # Milo
 
-A utility for https://github.com/go-pg/pg that makes persisting DDD aggregates easier.
+A utility package for https://github.com/go-pg/pg that makes persisting DDD aggregates easier.
 
 ## Quick Start
 
