@@ -1,9 +1,9 @@
 // {{ .EntityName }}Storer is the store interface. This should be copied into the domain layer.
 type {{ .EntityName }}Storer interface {
-	FindAll() ([]{{ .EntityType }}, error)
+	FindAll(ctx context.Context) ([]{{ .EntityType }}, error)
 
-	FindByID(id {{ .IDType }}) ({{ .EntityType }}, error)
-	FindByIDForUpdate(id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error)
+	FindByID(ctx context.Context, id {{ .IDType }}) ({{ .EntityType }}, error)
+	FindByIDForUpdate(ctx context.Context, id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error)
 
 	Save(context.Context, {{ .EntityType }}) error
 	Delete(context.Context, {{ .EntityType }}) error
@@ -20,9 +20,9 @@ func New{{ .EntityName }}Store(miloStore milo.Storer) *{{ .EntityName }}Store {
     }
 }
 
-func (s *{{ .EntityName }}Store) FindAll() ([]{{ .EntityType }}, error) {
+func (s *{{ .EntityName }}Store) FindAll(ctx context.Context) ([]{{ .EntityType }}, error) {
     entities := []{{ .EntityType }}{}
-    err := s.miloStore.FindAll(&entities)
+    err := s.miloStore.FindAll(ctx, &entities)
     if err != nil {
         return nil, errors.Wrap(err, "finding all entities")
     }
@@ -30,9 +30,9 @@ func (s *{{ .EntityName }}Store) FindAll() ([]{{ .EntityType }}, error) {
     return entities, nil
 }
 
-func (s *{{ .EntityName }}Store) FindByID(id {{ .IDType }}) ({{ .EntityType }}, error) {
+func (s *{{ .EntityName }}Store) FindByID(ctx context.Context, id {{ .IDType }}) ({{ .EntityType }}, error) {
     entity := &{{ trimLeft .EntityType "*" }}{}
-    err := s.miloStore.FindByID(entity, id)
+    err := s.miloStore.FindByID(ctx, entity, id)
     if err != nil {
         return nil, errors.Wrap(err, "finding entity by ID")
     }
@@ -40,9 +40,9 @@ func (s *{{ .EntityName }}Store) FindByID(id {{ .IDType }}) ({{ .EntityType }}, 
     return entity, nil
 }
 
-func (s *{{ .EntityName }}Store) FindByIDForUpdate(id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error) {
+func (s *{{ .EntityName }}Store) FindByIDForUpdate(ctx context.Context, id {{ .IDType }}, skipLocked bool) ({{ .EntityType }}, error) {
     entity := &{{ trimLeft .EntityType "*" }}{}
-    err := s.miloStore.FindByIDForUpdate(entity, id, skipLocked)
+    err := s.miloStore.FindByIDForUpdate(ctx, entity, id, skipLocked)
     if err != nil {
         return nil, errors.Wrap(err, "finding entity by ID for update")
     }
