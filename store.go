@@ -153,7 +153,7 @@ func (s *Store) FindAll(entities interface{}) error {
 
 	err := query.Select()
 	if err != nil {
-		return errors.Wrap(err, "selecing the model")
+		return errors.Wrap(err, "selecting the model")
 	}
 
 	entitiesValue := reflect.ValueOf(entities).Elem()

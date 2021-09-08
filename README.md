@@ -109,7 +109,7 @@ func (c *customer) ToEntity() (interface{}, error) {
 
 ### FindBy and FindOneBy
 
-FindBy and FindOnBy (and variants) take in an additional argument of one or more `Expression`. Here is an example of `Equal` and `NotEqual`:
+FindBy and FindOneBy (and variants) take in an additional argument of one or more `Expression`. Here is an example of `Equal` and `NotEqual`:
 
 ```go
 // Find all customers with a first name of John.
