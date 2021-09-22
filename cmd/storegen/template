@@ -34,6 +34,10 @@ func (s *{{ .EntityName }}Store) FindByID(ctx context.Context, id {{ .IDType }})
     entity := &{{ trimLeft .EntityType "*" }}{}
     err := s.miloStore.FindByID(ctx, entity, id)
     if err != nil {
+        if errors.Is(err, milo.ErrNotFound) {
+			return nil, {{ .NotFoundErrorType }}
+		}
+
         return nil, errors.Wrap(err, "finding entity by ID")
     }
 
@@ -44,6 +48,10 @@ func (s *{{ .EntityName }}Store) FindByIDForUpdate(ctx context.Context, id {{ .I
     entity := &{{ trimLeft .EntityType "*" }}{}
     err := s.miloStore.FindByIDForUpdate(ctx, entity, id, skipLocked)
     if err != nil {
+        if errors.Is(err, milo.ErrNotFound) {
+			return nil, {{ .NotFoundErrorType }}
+		}
+
         return nil, errors.Wrap(err, "finding entity by ID for update")
     }
 
