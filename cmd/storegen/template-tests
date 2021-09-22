@@ -1,0 +1,80 @@
+func TestNew{{ .EntityName }}Store(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+}
+
+func Test{{ .EntityName }}Store_FindAll(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+
+	miloStore.On("FindAll", mock.Anything, mock.AnythingOfType("*[]{{ .EntityType }}")).Return(nil).Once()
+
+	{{ .EntityName }}s, err := store.FindAll(context.Background())
+	assert.NotNil({{ .EntityName }}s)
+	assert.NoError(err)
+}
+
+func Test{{ .EntityName }}Store_FindByID(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+
+	id := entityid.DefaultGenerator.Generate()
+
+	miloStore.On("FindByID", mock.Anything, mock.AnythingOfType("{{ .EntityType }}"), id).Return(nil).Once()
+
+	entity, err := store.FindByID(context.Background(), id)
+	assert.NotNil(entity)
+	assert.NoError(err)
+}
+
+func Test{{ .EntityName }}Store_FindByIDForUpdate(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+
+	id := entityid.DefaultGenerator.Generate()
+	skipLocked := true
+
+	miloStore.On("FindByIDForUpdate", mock.Anything, mock.AnythingOfType("{{ .EntityType }}"), id, skipLocked).Return(nil).Once()
+
+	entity, err := store.FindByIDForUpdate(context.Background(), id, skipLocked)
+	assert.NotNil(entity)
+	assert.NoError(err)
+}
+
+func Test{{ .EntityName }}Store_Save(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+
+	miloStore.On("Save", mock.Anything, mock.AnythingOfType("{{ .EntityType }}")).Return(nil).Once()
+
+	err := store.Save(context.Background(), &domain.{{ .EntityName }}{})
+	assert.NoError(err)
+}
+
+func Test{{ .EntityName }}Store_Delete(t *testing.T) {
+	assert := assert.New(t)
+
+	miloStore := &MockMiloStorer{}
+	store := New{{ .EntityName }}Store(miloStore)
+	assert.NotNil(store)
+
+	miloStore.On("Delete", mock.Anything, mock.AnythingOfType("{{ .EntityType }}")).Return(nil).Once()
+
+	err := store.Delete(context.Background(), &domain.{{ .EntityName }}{})
+	assert.NoError(err)
+}
